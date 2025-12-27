@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Trajan Pro';
+  src: local('Trajan Pro'), local('TrajanPro-Regular'), url('https://db.onlinewebfonts.com/t/1db29588408eadbd4406aae92e599712.woff2') format('woff2'); /* Fallback URL just in case, preferably local */
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  @apply bg-premium-dark text-gray-200 font-sans;
+}
+
+.premium-card {
+  @apply bg-premium-gray border border-glass-white rounded-xl shadow-2xl;
+}
+
+.premium-glass {
+  @apply bg-glass-white backdrop-blur-md border border-white/10;
+}
