@@ -52,8 +52,8 @@ TRANSLATIONS = {
         "es": "Carga y resultados"
     },
     "tab_script": {
-        "en": "Converter Script",
-        "es": "Script de conversión"
+        "en": "Conversion Script",
+        "es": "Script de conversión de .edf a .parquet"
     },
     "metric_total": {
         "en": "Total Checkpoints",
@@ -391,34 +391,9 @@ st.sidebar.header(t("settings"))
 refresh_btn = st.sidebar.button(t("refresh_btn"))
 loss_threshold = st.sidebar.slider(t("threshold_label"), 0.0, 1.0, 0.60, 0.01)
 
-# Sidebar History
-st.sidebar.divider()
-st.sidebar.subheader("📂 " + (t("history_label") if "history_label" in TRANSLATIONS else "Processed Files"))
+# Get processed files list (moved from sidebar)
 processed_files = get_processed_files_list()
-
-selected_history_files = []
-
-if processed_files:
-    # Use dataframe for scrollable list
-    df_files = pd.DataFrame({"filename": processed_files})
-    
-    # Configure selection
-    # Enable multi-selection
-    event = st.sidebar.dataframe(
-        df_files,
-        column_config={"filename": st.column_config.TextColumn("Filename / Archivo")},
-        use_container_width=True,
-        hide_index=True,
-        height=600, 
-        on_select="rerun",
-        selection_mode="multi-row"
-    )
-    
-    if event.selection.rows:
-        indices = event.selection.rows
-        selected_history_files = df_files.iloc[indices]["filename"].tolist()
-else:
-    st.sidebar.info("No files processed yet.")
+selected_history_files = [] # Initialize here for tab2
 
 # Logic to load data
 def load_data(force_refresh=False):
@@ -512,29 +487,70 @@ with tab1:
 # TAB 2: INFERENCE
 # ==============================================================================
 with tab2:
-    st.header(t("inf_header"))
-    st.markdown(t("inf_desc"))
+    # Create layout: Left (History List) | Right (Upload + Results)
+    col_history, col_main = st.columns([1, 3])
     
-    col_input, col_model = st.columns([3, 7])
+    selected_history_files = []
     
-    with col_input:
-        uploaded_files = st.file_uploader(t("upload_label"), type=["parquet", "edf"], accept_multiple_files=True)
-    
-    with col_model:
-        # Prepare model list
-        if not df.empty:
-            # Sort by val_loss to put best models first
-            sorted_models = df.sort_values(by="val_loss", ascending=True, na_position='last')
-            model_options = sorted_models['filename'].tolist()
-            
-            # Default to best
-            best_model_idx = 0
-            
-            selected_model_name = st.selectbox(t("select_model"), model_options, index=best_model_idx)
-            
-            # Show model details
-            # Show model details
-            if selected_model_name:
+    with col_history:
+        st.subheader("📂 " + (t("history_label") if "history_label" in TRANSLATIONS else "Processed Files"))
+        if processed_files:
+             df_files = pd.DataFrame({"filename": processed_files})
+             event = st.dataframe(
+                df_files,
+                column_config={"filename": st.column_config.TextColumn("Filename / Archivo")},
+                use_container_width=True,
+                hide_index=True,
+                height=600, 
+                on_select="rerun",
+                selection_mode="multi-row",
+                key="history_list_main" # Unique key
+            )
+             if event.selection.rows:
+                indices = event.selection.rows
+                selected_history_files = df_files.iloc[indices]["filename"].tolist()
+        else:
+            st.info("No files processed yet.")
+
+    with col_main:
+        # File Uploader specific CSS hack for this column? 
+        # Global CSS injects to all, which is fine.
+        
+        uploaded_files = st.file_uploader(
+            label=t("upload_label"),
+            type=["parquet", "edf"],
+            accept_multiple_files=True,
+            key="uploader_main"
+        )
+        
+        st.markdown("---")
+        
+        # Select Model (Moved here or keep in context?)
+        # Logic requires 'models' list
+        # We need to ensure we have models loaded (Sidebar logic handles loading)
+        if df.empty:
+             st.warning(t("no_models_err"))
+             selected_model_name = None
+        else:
+             # Just use the best model by default logic from before, 
+             # but we need to know WHICH model to use if we re-run.
+             # We can keep model selection implicit (best) or explicit.
+             # The UI had model selection *implied* or previously I might have missed it being passed down.
+             # Actually, the logic for finding 'best_model_row' was in main body.
+             # Let's grab the best model based on current df logic.
+             # Re-implement simple selection or use sidebar override if we had one?
+             # For now stick to Best Model to keep UI clean as requested before.
+             # Or add a small selector in this column.
+             
+             valid_df = df[df['val_loss'].notna()].copy()
+             if not valid_df.empty:
+                best_model_row = valid_df.sort_values(by='val_loss', ascending=True).iloc[0]
+                selected_model_name = best_model_row['filename']
+                
+                st.markdown(f"**{t('select_model')}**")
+                st.markdown(f"Using Model: **{selected_model_name}**")
+                
+                # Show model details
                 model_meta = df[df['filename'] == selected_model_name].iloc[0]
                 
                 # Parse filename for details
@@ -567,10 +583,6 @@ with tab2:
                 with info_c3:
                      st.markdown(f"**{t('files_label')}:** {n_files}")
                      st.markdown(f"**{t('params_label')}:** {lr}, {weights}, {workers}")
-        else:
-            st.error(t("no_models_err"))
-            selected_model_name = None
-
     # Auto-trigger analysis if files are present OR history file is selected
     if (uploaded_files or selected_history_files) and selected_model_name:
         
