@@ -395,7 +395,30 @@ loss_threshold = st.sidebar.slider(t("threshold_label"), 0.0, 1.0, 0.60, 0.01)
 st.sidebar.divider()
 st.sidebar.subheader("📂 " + (t("history_label") if "history_label" in TRANSLATIONS else "Processed Files"))
 processed_files = get_processed_files_list()
-selected_history_file = st.sidebar.selectbox("Select File / Seleccionar Archivo", ["None"] + processed_files)
+
+selected_history_files = []
+
+if processed_files:
+    # Use dataframe for scrollable list
+    df_files = pd.DataFrame({"filename": processed_files})
+    
+    # Configure selection
+    # Enable multi-selection
+    event = st.sidebar.dataframe(
+        df_files,
+        column_config={"filename": st.column_config.TextColumn("Filename / Archivo")},
+        use_container_width=True,
+        hide_index=True,
+        height=600, 
+        on_select="rerun",
+        selection_mode="multi-row"
+    )
+    
+    if event.selection.rows:
+        indices = event.selection.rows
+        selected_history_files = df_files.iloc[indices]["filename"].tolist()
+else:
+    st.sidebar.info("No files processed yet.")
 
 # Logic to load data
 def load_data(force_refresh=False):
@@ -530,17 +553,17 @@ with tab2:
             selected_model_name = None
 
     # Auto-trigger analysis if files are present OR history file is selected
-    if (uploaded_files or selected_history_file != "None") and selected_model_name:
+    if (uploaded_files or selected_history_files) and selected_model_name:
         
         # Determine source: History OR Upload
         files_to_process = []
-        if selected_history_file != "None":
+        if selected_history_files:
             # Mock file object for history
-            # Create a simple objects with 'name' attribute
             class MockFile:
                 def __init__(self, name): self.name = name
-            files_to_process = [MockFile(selected_history_file)]
-            st.info(f"Viewing processed file: {selected_history_file}")
+            
+            files_to_process = [MockFile(name) for name in selected_history_files]
+            st.info(f"Viewing {len(files_to_process)} processed files from history.")
         else:
             files_to_process = uploaded_files
 
