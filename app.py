@@ -488,7 +488,8 @@ with tab1:
 # ==============================================================================
 with tab2:
     # Create layout: Left (History List) | Right (Upload + Results)
-    col_history, col_main = st.columns([1, 3])
+    # User requested ~10% width for left column. Ratio 1:9.
+    col_history, col_main = st.columns([1, 9])
     
     selected_history_files = []
     
@@ -496,12 +497,19 @@ with tab2:
         st.subheader("📂 " + (t("history_label") if "history_label" in TRANSLATIONS else "Processed Files"))
         if processed_files:
              df_files = pd.DataFrame({"filename": processed_files})
+             # Remove .parquet extension for display
+             df_files["display_name"] = df_files["filename"].str.replace(".parquet", "", regex=False)
+             
+             # Calculate height for ~7 rows. 35px per row + header. ~250-300px.
              event = st.dataframe(
                 df_files,
-                column_config={"filename": st.column_config.TextColumn("Filename / Archivo")},
+                column_config={
+                    "display_name": st.column_config.TextColumn("File / Archivo"),
+                    "filename": None # Hide original filename
+                },
                 use_container_width=True,
                 hide_index=True,
-                height=600, 
+                height=250, 
                 on_select="rerun",
                 selection_mode="multi-row",
                 key="history_list_main" # Unique key
@@ -510,7 +518,7 @@ with tab2:
                 indices = event.selection.rows
                 selected_history_files = df_files.iloc[indices]["filename"].tolist()
         else:
-            st.info("No files processed yet.")
+            st.info("No files.")
 
     with col_main:
         # File Uploader specific CSS hack for this column? 
