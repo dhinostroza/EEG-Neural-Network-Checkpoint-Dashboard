@@ -441,6 +441,25 @@ elif st.session_state.df_models.empty:
 df = st.session_state.df_models
 
 # --- TABS LAYOUT ---
+# Auto-switch to inference tab if history is selected
+if selected_history_files:
+    # Use index 1 (Inference/Results) as default if selection exists
+    # We can't robustly force-switch tabs in Streamlit without custom component hack or 
+    # resetting the whole logic. 
+    # BUT we can use the `st.tabs` indices if we manage state? No, tabs are UI containers.
+    # We can just render the content. 
+    # The user asks "shouldn't the page switch".
+    # We can try to prioritize the tab default, but Streamlit tabs are client-side.
+    # Better approach: If history selected, we might just SHOW the results? 
+    # Or implies the user is ON tab 2? 
+    # We can't change active tab easily.
+    # However, we can use a session state variable for 'active_tab' if we used st.radio or similar.
+    # With st.tabs, it's hard.
+    # WORKAROUND: We can print a message or just rely on user being there.
+    # BUT, if we can't switch, we can at least make sure it doesn't crash on Tab 1? 
+    # No, the crash is in Tab 2 logic.
+    pass
+
 tab1, tab2, tab3 = st.tabs([t("tab_dashboard"), t("tab_inference"), t("tab_script")])
 
 # ==============================================================================
@@ -558,9 +577,10 @@ with tab2:
         # Determine source: History OR Upload
         files_to_process = []
         if selected_history_files:
-            # Mock file object for history
             class MockFile:
-                def __init__(self, name): self.name = name
+                def __init__(self, name): 
+                    self.name = name
+                    self.from_history = True # Flag to identify
             
             files_to_process = [MockFile(name) for name in selected_history_files]
             st.info(f"Viewing {len(files_to_process)} processed files from history.")
@@ -579,16 +599,24 @@ with tab2:
             status_text.text(t("processing"))
             
             try:
-                # 1. Save uploaded file
+                # 1. Save uploaded file (Skip for History MockFiles)
+                is_history_file = hasattr(uploaded_file, 'from_history') and uploaded_file.from_history
+                
                 # Determine extension
                 file_ext = os.path.splitext(uploaded_file.name)[1].lower()
                 temp_filename = f"temp_upload_{i}{file_ext}"
                 
-                with open(temp_filename, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
+                if not is_history_file:
+                    with open(temp_filename, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                else:
+                    # It's a history file, we don't have the bytes, and we don't need them
+                    # because we expect to pull from SQL.
+                    # We just use the name for SQL lookup.
+                    pass
                 
-                # EDF Conversion Logic
-                if file_ext == ".edf":
+                # EDF Conversion Logic (Only for new real uploads)
+                if file_ext == ".edf" and not is_history_file:
                     status_text.text(f"Converting {uploaded_file.name} to Parquet...")
                     
                     # Define output parquet path
@@ -603,10 +631,7 @@ with tab2:
                         if os.path.exists(temp_filename): os.remove(temp_filename)
                         continue
                     
-                    # Success: Update variables to treat this as a parquet file now
-                    # We keep the original 'uploaded_file.name' for display/cache keys? 
-                    # Yes, keep uploaded_file.name for cache key so we don't re-convert if we implement smarter caching later.
-                    # But for 'input_df' loading, we perform:
+                    # Success
                     temp_filename = parquet_filename
                     file_ext = ".parquet" 
                     status_text.text(f"Conversion complete. Running inference...")
@@ -614,32 +639,46 @@ with tab2:
                 # Check cache for the ORIGINAL filename (edf or parquet)
                 cached_preds = retrieve_from_sql(uploaded_file.name)
                 
-                # Load Data immediately (only if parquet - which it is now if conversion succeeded)
-                if file_ext == ".parquet":
+                # Load Data immediately (only if parquet AND not history mock)
+                if file_ext == ".parquet" and not is_history_file:
                     input_df = pd.read_parquet(temp_filename)
                 else: 
-                     # Should not happen if logic above works
+                     # If history mock, we don't have file content, so empty DF.
+                     # This relies on cached_preds being present.
                      input_df = pd.DataFrame() 
 
                 predictions = []
                 
                 # ------------------------------------------------------------------
-                # FAST PATH: Check for Pre-computed Results
+                # FAST PATH: Check for Pre-computed Results (SQL)
                 # ------------------------------------------------------------------
-                cached_preds = retrieve_from_sql(uploaded_file.name)
+                # cached_preds already retrieved above
                 
-                if cached_preds and (input_df.empty or len(cached_preds) == len(input_df)):
-                    # Instant load (If edf and cached, we might not know len(input_df), so allow if cached_preds exists)
+                if cached_preds:
+                    # If we have cached results, we use them.
+                    # For history files, we EXPECT this.
+                    # If input_df is empty (history file), we construct a dummy DF for visualization
+                    
                     # Instant load
-                    time.sleep(0.5) # Force visibility of processing text as requested
+                    time.sleep(0.5) 
                     progress_bar.progress(100)
                     predictions = cached_preds
-                    # Clear indicators for clean look
+                    
+                    # Reconstruct input_df if missing (History case)
+                    if input_df.empty:
+                        # We need 'predicted_mid' later, and potentially ground truth if we had it.
+                        # For history, we might not have ground truth unless we saved it?
+                        # SQL schema has 'predicted_stage' (string). 
+                        # retrieve_from_sql returns INDICES.
+                        # We create a dummy DF with length = len(predictions)
+                        input_df = pd.DataFrame(index=range(len(predictions)))
+                        
+                    # Clear indicators
                     status_text.empty()
                     progress_bar.empty()
                 else:
                     # ------------------------------------------------------------------
-                    # NORMAL PATH: Run Inference (Only show progress here)
+                    # NORMAL PATH: Run Inference (Real Uploads Only)
                     # ------------------------------------------------------------------
                     if file_ext == ".edf":
                         # This block shouldn't be reached if we converted above
