@@ -5,7 +5,7 @@ import torch
 import time
 import altair as alt
 from analyzer import CheckpointAnalyzer
-from inference import get_model, load_checkpoint_weights, preprocess_spectrogram, detect_architecture
+from inference import get_model, load_checkpoint_weights, preprocess_spectrogram, detect_architecture, convert_edf_to_parquet
 
 
 
@@ -497,37 +497,35 @@ with tab2:
                 # EDF Conversion Logic
                 if file_ext == ".edf":
                     status_text.text(f"Converting {uploaded_file.name} to Parquet...")
-                    # Placeholder for conversion
-                    # For now, we simulate or fail if not implemented
-                    # But user said "plug in conversion logic later", implies we should have a placeholder
-                    # We will output a warning if strictly needed, or just skip if we can't do it.
-                    # Actually, if we can't make parquet, we can't proceed.
-                    # Let's creating a dummy parquet or just stopping.
-                    # "plug in the conversion logic later" -> means the app should ACCEPT edf, try to handle it.
                     
-                    # Create a dummy parquet for flow testing so it doesn't crash?
-                    # Or just wait for logic.
-                    # Let's print a message and skip for now unless we have a dummy.
-                    # Actually, let's try to assume a converted filename exists or create a dummy one?
-                    # No, better to show a clear "Conversion Pending" message and stop for this file.
+                    # Define output parquet path
+                    parquet_filename = temp_filename.replace(".edf", ".parquet")
                     
-                    # BUT user wants "tracking logic" to work.
-                    # So we should check if cached_preds exists for the EDF name FIRST.
-                    # retrieve_from_sql uses uploaded_file.name.
-                    pass 
+                    # Run conversion
+                    success, msg = convert_edf_to_parquet(temp_filename, parquet_filename)
+                    
+                    if not success:
+                        st.error(f"Failed to convert {uploaded_file.name}: {msg}")
+                        # Clean up temp edf
+                        if os.path.exists(temp_filename): os.remove(temp_filename)
+                        continue
+                    
+                    # Success: Update variables to treat this as a parquet file now
+                    # We keep the original 'uploaded_file.name' for display/cache keys? 
+                    # Yes, keep uploaded_file.name for cache key so we don't re-convert if we implement smarter caching later.
+                    # But for 'input_df' loading, we perform:
+                    temp_filename = parquet_filename
+                    file_ext = ".parquet" 
+                    status_text.text(f"Conversion complete. Running inference...")
                 
                 # Check cache for the ORIGINAL filename (edf or parquet)
                 cached_preds = retrieve_from_sql(uploaded_file.name)
                 
-                # Load Data immediately (only if parquet)
+                # Load Data immediately (only if parquet - which it is now if conversion succeeded)
                 if file_ext == ".parquet":
                     input_df = pd.read_parquet(temp_filename)
-                elif file_ext == ".edf":
-                     # If we have cached results, we might not need the DF if we just display results?
-                     # But we need DF for "Length" check line 443: len(cached_preds) == len(input_df)
-                     # So we need to mock input_df or true logic.
-                     # If cached, we might skip length check if we trust cache?
-                     # For now, let's just use empty DF if not converted.
+                else: 
+                     # Should not happen if logic above works
                      input_df = pd.DataFrame() 
 
                 predictions = []
@@ -551,10 +549,8 @@ with tab2:
                     # NORMAL PATH: Run Inference (Only show progress here)
                     # ------------------------------------------------------------------
                     if file_ext == ".edf":
-                        st.warning(f"EDF conversion not implemented yet for {uploaded_file.name}")
-                        status_text.empty()
-                        progress_bar.empty()
-                        continue
+                        # This block shouldn't be reached if we converted above
+                        pass
                     
                     status_text = st.empty()
                     progress_bar = st.progress(0)

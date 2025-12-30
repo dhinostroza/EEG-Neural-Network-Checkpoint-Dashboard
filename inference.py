@@ -6,6 +6,17 @@ import pandas as pd
 import argparse
 import sys
 import os
+import logging
+import warnings
+
+# Optional imports for EDF conversion
+try:
+    import mne
+    from scipy import signal
+    from skimage.transform import resize
+    HAS_EDF_LIBS = True
+except ImportError:
+    HAS_EDF_LIBS = False
 
 # ==============================================================================
 # 1. MODEL DEFINITION
@@ -54,7 +65,75 @@ def preprocess_spectrogram(spectrogram_flat):
     return torch.from_numpy(spectrogram_2d)
 
 # ==============================================================================
-# 3. MAIN INFERENCE
+# 3. EDF CONVERSION (Derived from user script)
+# ==============================================================================
+def convert_edf_to_parquet(edf_path, output_path):
+    """
+    Converts a single .edf file to .parquet spectrograms for inference.
+    Does NOT require XML annotations (uses dummy labels).
+    """
+    if not HAS_EDF_LIBS:
+        raise ImportError("Missing libraries for EDF conversion. Please install: mne, scipy, scikit-image")
+        
+    try:
+        # Suppress MNE info messages
+        mne.set_log_level('WARNING') 
+        
+        # 1. Read EDF
+        # verbose=False to keep logs clean
+        raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
+        
+        # 2. Pick Channels
+        # The user script uses ['EEG']. We should try to be robust if 'EEG' isn't exact.
+        # But for now, let's stick to the script's logic.
+        if 'EEG' in raw.ch_names:
+            raw.pick_channels(['EEG'])
+        elif 'EEG(sec)' in raw.ch_names:
+             raw.pick_channels(['EEG(sec)'])
+        else:
+            # Fallback: select first channel if 'EEG' not found? 
+            # Or raise error. Let's try to map common names or just take the first one.
+            # SHHS usually has 'EEG'.
+            available = raw.ch_names
+            print(f"Warning: 'EEG' channel not found in {available}. Using first channel: {available[0]}")
+            raw.pick_channels([available[0]])
+            
+        # 3. Resample to 64Hz (from script)
+        raw.resample(64, npad="auto")
+        
+        # 4. Epoching (30 seconds * 64 Hz)
+        # Note: raw.get_data() returns (n_channels, n_times)
+        # We assume 1 channel.
+        data_full = raw.get_data() # (1, total_samples)
+        total_samples = data_full.shape[1]
+        epoch_len = 30 * 64
+        
+        # Drop residual samples
+        n_epochs = total_samples // epoch_len
+        epochs_data = data_full[0, :n_epochs * epoch_len].reshape(-1, epoch_len)
+        
+        # 5. Spectrogram Generation
+        spectrograms = []
+        for epoch_data in epochs_data:
+            f, t, Sxx = signal.spectrogram(epoch_data, fs=64, nperseg=128, noverlap=64)
+            Sxx_db = 10 * np.log10(Sxx + 1e-10)
+            Sxx_resized = resize(Sxx_db, (76, 60), anti_aliasing=True, mode='reflect')
+            spectrograms.append(Sxx_resized.flatten())
+            
+        # 6. Create DataFrame
+        df_out = pd.DataFrame(spectrograms)
+        # Add dummy valid dummy labels (-1) since we don't have annotations
+        df_out['label'] = -1 
+        
+        # Save
+        df_out.to_parquet(output_path)
+        return True, f"Converted {n_epochs} epochs."
+        
+    except Exception as e:
+        return False, str(e)
+
+# ==============================================================================
+# 4. MAIN INFERENCE
 # ==============================================================================
 def load_checkpoint_weights(model, checkpoint_path):
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
