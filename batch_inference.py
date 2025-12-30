@@ -67,6 +67,7 @@ def main():
     parser.add_argument("--data_dir", default="./parquet_files", help="Directory containing .parquet files")
     parser.add_argument("--output", default="predictions.sql", help="Output SQL file")
     parser.add_argument("--limit", type=int, help="Limit number of files to process")
+    parser.add_argument("--rename_suffix", default="_processed", help="Suffix to append to processed files (e.g. file.parquet -> file_processed.parquet)")
     
     args = parser.parse_args()
     
@@ -194,6 +195,19 @@ def main():
                 # Mark as done
                 mark_as_processed(fname)
                 
+                # RENAME FILE (User Request for Cleanup)
+                if args.rename_suffix:
+                    try:
+                        folder = os.path.dirname(fpath)
+                        base_name_no_ext = os.path.splitext(fname)[0]
+                        ext = os.path.splitext(fname)[1]
+                        new_name = f"{base_name_no_ext}{args.rename_suffix}{ext}"
+                        new_path = os.path.join(folder, new_name)
+                        os.rename(fpath, new_path)
+                        # print(f"   -> Renamed to {new_name}")
+                    except Exception as rename_err:
+                        print(f"   ⚠️ Failed to rename {fname}: {rename_err}")
+
                 duration = time.time() - file_start
                 print(f"[{idx+1}/{len(files_to_process)}] {fname}: {len(all_preds)} epochs in {duration:.2f}s ({len(all_preds)/duration:.1f} epoch/s)")
                 

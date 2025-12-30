@@ -678,6 +678,50 @@ with tab2:
                         mime="text/csv",
                         key=f"download_{i}" # Unique key for each button
                     )
+
+                # ----------------------------------------------------------------------
+                # GROUND TRUTH COMPARISON (User Request)
+                # ----------------------------------------------------------------------
+                # Check for label/stage column with valid values (not -1)
+                gt_col = None
+                for potential_col in ['label', 'stage', 'sleep_stage', 'annotation']:
+                    if potential_col in input_df.columns:
+                        gt_col = potential_col
+                        break
+                
+                if gt_col:
+                    # Check if we have real values (not dummy -1 from conversion)
+                    unique_vals = input_df[gt_col].unique()
+                    # If we have values >= 0, it likely has ground truth
+                    # (Filter out -1)
+                    valid_labels = [v for v in unique_vals if v >= 0]
+                    
+                    if valid_labels:
+                        st.divider()
+                        st.subheader("📊 Comparison with Ground Truth")
+                        
+                        comp_df = pd.DataFrame({
+                            "Epoch": range(len(input_df)),
+                            "Ground Truth (Index)": input_df[gt_col],
+                            "Predicted (Index)": input_df['predicted_mid'],
+                        })
+                        
+                        # Map strings
+                        comp_df["Ground Truth"] = comp_df["Ground Truth (Index)"].map(stage_map).fillna("Unknown")
+                        comp_df["Predicted"] = input_df['predicted_label']
+                        
+                        # Match col
+                        comp_df["Match"] = comp_df["Ground Truth (Index)"] == comp_df["Predicted (Index)"]
+                        
+                        # Accuracy for this file
+                        acc = comp_df["Match"].mean() * 100
+                        st.markdown(f"**Agreement/Accuracy**: `{acc:.2f}%`")
+                        
+                        # Show table
+                        st.dataframe(comp_df[["Epoch", "Ground Truth", "Predicted", "Match"]], width="stretch", height=400)
+                        
+                    else:
+                        st.caption("No ground truth labels found (values are all -1/missing).")
                     
             except Exception as e:
                 st.error(f"Error: {e}")
