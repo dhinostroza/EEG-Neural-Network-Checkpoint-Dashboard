@@ -25,7 +25,7 @@ TRANSLATIONS = {
     },
     "header_desc": {
         "en": "Monitor training results and identify top-performing models.",
-        "es": "Los EEG fueron convertidos de formato .edf a .parquet, para acelerar la lectura. El análisis se hizo con el mejor modelo entrenado disponible y se procesó con numpy para optimizar la velocidad de estos resultados."
+        "es": "Monitorea los resultados del entrenamiento e identifica los modelos de mejor rendimiento. Los EEG fueron convertidos de formato .edf a .parquet, para acelerar la lectura. El análisis se hizo con el mejor modelo entrenado disponible y se procesó con numpy para optimizar la velocidad de estos resultados."
     },
     "settings": {
         "en": "Settings",
@@ -50,6 +50,10 @@ TRANSLATIONS = {
     "tab_inference": {
         "en": "Inference Playground",
         "es": "Carga y resultados"
+    },
+    "tab_script": {
+        "en": "Converter Script",
+        "es": "Script de conversión"
     },
     "metric_total": {
         "en": "Total Checkpoints",
@@ -360,7 +364,7 @@ elif st.session_state.df_models.empty:
 df = st.session_state.df_models
 
 # --- TABS LAYOUT ---
-tab1, tab2 = st.tabs([t("tab_dashboard"), t("tab_inference")])
+tab1, tab2, tab3 = st.tabs([t("tab_dashboard"), t("tab_inference"), t("tab_script")])
 
 # ==============================================================================
 # TAB 1: DASHBOARD
@@ -677,3 +681,16 @@ with tab2:
                     
             except Exception as e:
                 st.error(f"Error: {e}")
+
+# ==============================================================================
+# TAB 3: CONVERTER SCRIPT
+# ==============================================================================
+with tab3:
+    st.header(t("tab_script"))
+    script_path = "pre_shhs_edf2parquet.py"
+    if os.path.exists(script_path):
+        with open(script_path, "r", encoding="utf-8") as f:
+            code_content = f.read()
+            st.code(code_content, language="python")
+    else:
+        st.error(f"Script file not found: {script_path}")
