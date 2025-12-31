@@ -240,10 +240,17 @@ def inject_custom_css():
             display: none;
         }
         section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] div div::after {
-            content: "Límite 200MB por archivo • PARQUET, EDF";
+            content: "Límite 200MB por archivo • PARQUET, EDF, XML";
             font-size: 0.8em;
         }
         
+        section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
+            min-height: 150px; /* Increase height by ~40px */
+            display: flex;
+            align-items: center; 
+            justify-content: center;
+        }
+
         /* Drag and Drop Text */
         section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] div div span {
              display: none;
