@@ -824,6 +824,19 @@ with tab2:
                             tooltip=[c_stage, c_count]
                         ).properties(height=350)
                         st.altair_chart(chart, width="stretch")
+                        
+                        # Prediction Counts Row (Metrics)
+                        st.markdown("##### Prediction Counts")
+                        p_counts = input_df['predicted_label'].value_counts()
+                        
+                        # Create 5 columns for W, N1, N2, N3, REM
+                        cnt_cols = st.columns(5)
+                        stages_ordered = [t("stage_wake"), "N1", "N2", "N3", "REM"]
+                        
+                        for idx, stage_name in enumerate(stages_ordered):
+                            count_val = p_counts.get(stage_name, 0)
+                            with cnt_cols[idx]:
+                                st.metric(label=stage_name, value=count_val)
 
                     with col_context:
                         st.markdown(f"#### {t('model_context')}")
@@ -942,19 +955,7 @@ with tab2:
                              st.markdown("#### Comparison")
                              st.info("No Ground Truth labels found in this file.")
 
-                    # --- Prediction Counts Summary (Bottom Left or Full Width?) ---
-                    # Putting it in column 1 (Left) as requested "counts of the present result"
-                    with tbl_col1:
-                        st.divider()
-                        st.markdown("#### Prediction Counts")
-                        pred_counts_df = input_df['predicted_label'].value_counts().reset_index()
-                        pred_counts_df.columns = ["Stage", "Count"]
-                        # Sort by standard stage order if possible
-                        stage_order = {v: k for k, v in stage_map.items()} # Name -> Index
-                        pred_counts_df['Order'] = pred_counts_df['Stage'].map(lambda x: next((k for k, v in stage_map.items() if v == x), 99))
-                        pred_counts_df = pred_counts_df.sort_values('Order').drop(columns=['Order'])
-                        
-                        st.dataframe(pred_counts_df, use_container_width=True, hide_index=True)
+
                              
                     # --- CHARTS (Below tables or above? User asked for DETAILED RESULTS in tables) ---
                     # Ensuring charts are still present (they were earlier in code, lines ~920 in previous version)
