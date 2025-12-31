@@ -37,12 +37,16 @@ TRANSLATIONS = {
         "es": "Idioma"
     },
     "refresh_btn": {
-        "en": "Refresh / Scan New Files",
-        "es": "Actualizar / escanear archivos"
+        "en": "Refresh / Scan Models",
+        "es": "Cargar los modelos nuevos"
     },
     "threshold_label": {
         "en": "Success Threshold (Val Loss)",
         "es": "Umbral de éxito (Val Loss)"
+    },
+    "loading": {
+        "en": "Loading...",
+        "es": "Cargando..."
     },
     "tab_dashboard": {
         "en": "Model Dashboard",
