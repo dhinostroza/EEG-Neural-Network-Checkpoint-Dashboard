@@ -4,6 +4,7 @@ import numpy as np
 import os
 import torch
 import time
+import shutil
 import altair as alt
 import xml.etree.ElementTree as ET
 from analyzer import CheckpointAnalyzer
@@ -605,7 +606,7 @@ with st.sidebar:
     st.divider()
     st.header(t("settings"))
     refresh_btn = st.button(t("refresh_btn"))
-    loss_threshold = st.slider(t("threshold_label"), 0.0, 1.0, 0.60, 0.01)
+    loss_threshold = st.slider(t("threshold_label"), 0.0, 1.0, 0.56, 0.01)
 
 # Get processed files list (moved from sidebar)
 processed_files = get_processed_files_list()
@@ -934,11 +935,21 @@ with tab2:
                     cached_preds = retrieve_from_sql(uploaded_file.name)
                     
                     # Load Data immediately (only if parquet AND not history mock)
+                    # Load Data immediately (only if parquet AND not history mock)
                     if file_ext == ".parquet" and not is_history_file:
                         input_df = pd.read_parquet(temp_filename)
+                    elif is_history_file and file_ext == ".parquet":
+                        # Try to load if persisted on disk (User Request: "Actual parquet file")
+                        if os.path.exists(uploaded_file.name):
+                             try:
+                                 input_df = pd.read_parquet(uploaded_file.name)
+                                 st.toast(f"Loaded content for {uploaded_file.name} from disk")
+                             except:
+                                 input_df = pd.DataFrame()
+                        else:
+                             input_df = pd.DataFrame()
                     else: 
-                         # If history mock, we don't have file content, so empty DF.
-                         # This relies on cached_preds being present.
+                         # Fallback
                          input_df = pd.DataFrame() 
                     
                     # --- MERGE GROUND TRUTH IF FOUND ---
@@ -1046,6 +1057,14 @@ with tab2:
                         # Append suffix for display in history: SC4001E.parquet -> SC4001E_processed.parquet
                         base, ext = os.path.splitext(uploaded_file.name)
                         processed_filename = f"{base}_processed{ext}"
+                        
+                        # PERSIST FILE TO DISK (User Request: "Actual parquet file")
+                        # We copy the temp_filename (which holds the converted/uploaded data) to the processed name
+                        try:
+                            if os.path.exists(temp_filename):
+                                shutil.copy(temp_filename, processed_filename)
+                        except Exception as e:
+                            print(f"Error persisting file: {e}")
                         
                         save_success = save_results_to_sql(processed_filename, predictions, dummy_confs, selected_model_name)
                         if save_success:
