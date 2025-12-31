@@ -120,14 +120,103 @@ def convert_edf_to_parquet(edf_path, output_path):
             Sxx_resized = resize(Sxx_db, (76, 60), anti_aliasing=True, mode='reflect')
             spectrograms.append(Sxx_resized.flatten())
             
+        # 6. Load Annotations (Hypnogram) if available
+        # Strategy: Look for file with same name but ending in "Hypnogram.edf"
+        # e.g. SC4001E0-PSG.edf -> SC4001EC-Hypnogram.edf
+        # Pattern for Sleep-EDF: SC4ssNE0-PSG.edf  -> SC4ss1EC-Hypnogram.edf (Note the 'C' and '1' vs '0')
+        # OR just search for *Hypnogram.edf in same folder and matching subject ID?
+        
+        # Simple heuristic: Look for *Hypnogram.edf in same dir that shares first 6 chars?
+        # SC4001...
+        base_name = os.path.basename(edf_path)
+        dir_name = os.path.dirname(edf_path)
+        
+        # Try finding standard Sleep-EDF match
+        # Assume filename schema: SC4001E0-PSG.edf
+        subject_id = base_name[:6] # SC4001
+        
+        candidates = glob.glob(os.path.join(dir_name, f"{subject_id}*Hypnogram.edf"))
+        
+        labels = [-1] * n_epochs
+        
+        if candidates:
+            hypno_path = candidates[0]
+            print(f"Found hypnogram: {hypno_path}")
+            try:
+                annot = mne.read_annotations(hypno_path)
+                raw.set_annotations(annot, emit_warning=False)
+                
+                # Extract events
+                # Use dataset agnostic mapping if possible
+                events, event_id = mne.events_from_annotations(raw, event_id=None, chunk_duration=30.)
+                
+                # Map events to our classes (W=0, N1=1, N2=2, N3=3, R=4)
+                # Sleep-EDF: Sleep stage W, 1, 2, 3, 4, R, Movement, ?
+                # Annotations might be: 'Sleep stage W', 'Sleep stage 1', ...
+                
+                # Create a stage array
+                # MNE `events` are [sample, 0, id]
+                # We need to render this into an array of length `n_epochs`
+                
+                # This is tricky because MNE events are sparse. 
+                # Better strategy: crop raw to match the PSG duration?
+                # Actually, `mne.make_fixed_length_events` isn't what we want.
+                # We want `mne.events_from_annotations` but we need to map them to epochs.
+                
+                # Let's use `extract_gt_from_xml` logic but adapted for EDF annotations?
+                # Or use `mne.Epochs` to get labels?
+                
+                tmax = 30. - 1. / raw.info['sfreq']
+                epochs = mne.Epochs(raw, events, event_id, tmin=0., tmax=tmax, baseline=None, verbose=False)
+                # This only yields epochs where events start? No, Hypnograms are duration-based.
+                
+                # Standard Sleep-EDF parsing manually might be safer/faster than MNE's auto-event
+                # because MNE splits long annotations into multiple events?
+                
+                # Let's try `crop` and `get_data`? No, annotations are metadata.
+                
+                # Manual parsing of annotations
+                # annot.onset (seconds), annot.duration (seconds), annot.description (str)
+                
+                # Initialize with -1
+                labels = np.full(n_epochs, -1, dtype=int)
+                
+                stage_map = {
+                    'Sleep stage W': 0,
+                    'Sleep stage 1': 1,
+                    'Sleep stage 2': 2,
+                    'Sleep stage 3': 3,
+                    'Sleep stage 4': 3, # Merge N3/N4
+                    'Sleep stage R': 4,
+                    'Movement time': -1,
+                    'Sleep stage ?': -1
+                }
+                
+                for onset, duration, desc in zip(annot.onset, annot.duration, annot.description):
+                    start_epoch = int(onset // 30)
+                    end_epoch = int((onset + duration) // 30)
+                    
+                    # Clip to available epochs
+                    start_epoch = max(0, start_epoch)
+                    end_epoch = min(n_epochs, end_epoch)
+                    
+                    val = stage_map.get(desc, -1)
+                    if val != -1:
+                        labels[start_epoch:end_epoch] = val
+                        
+            except Exception as e:
+                print(f"Failed to parse hypnogram: {e}")
+        else:
+             print("No hypnogram found.")
+
         # 6. Create DataFrame
         df_out = pd.DataFrame(spectrograms)
-        # Add dummy valid dummy labels (-1) since we don't have annotations
-        df_out['label'] = -1 
+        df_out['label'] = labels # Use the extracted labels
+        df_out['true_label'] = df_out['label'] # Redundant helper
         
         # Save
         df_out.to_parquet(output_path)
-        return True, f"Converted {n_epochs} epochs."
+        return True, f"Converted {n_epochs} epochs. GT Found: {bool(candidates)}"
         
     except Exception as e:
         return False, str(e)
