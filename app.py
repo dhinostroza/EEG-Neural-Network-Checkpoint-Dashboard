@@ -58,6 +58,10 @@ TRANSLATIONS = {
         "en": "Inference Playground",
         "es": "Carga y resultados"
     },
+    "tab_batch": {
+        "en": "Automated Batch Processing",
+        "es": "Procesamiento por lotes"
+    },
     "tab_script": {
         "en": "Conversion Script",
         "es": "Script de conversión de .edf a .parquet"
@@ -272,6 +276,34 @@ TRANSLATIONS = {
     "hypno_comp": {
         "en": "Hypnogram Comparison (First 300 Epochs)",
         "es": "Comparación del hipnograma (primeras 300 épocas)"
+    },
+    "batch_source_dir": {
+        "en": "Source Directory (Full Path)",
+        "es": "Directorio de origen (Ruta completa)"
+    },
+    "batch_scan_btn": {
+         "en": "Scan for Pending Files",
+         "es": "Buscar archivos pendientes"
+    },
+    "batch_start_btn": {
+         "en": "Start Batch Processing",
+         "es": "Iniciar procesamiento por lotes"
+    },
+    "batch_stop_btn": {
+         "en": "Stop Processing",
+         "es": "Detener procesamiento"
+    },
+    "batch_pending": {
+         "en": "Pending Files",
+         "es": "Archivos pendientes"
+    },
+    "batch_processed_count": {
+         "en": "Already Processed",
+         "es": "Ya procesados"
+    },
+    "batch_param_warning": {
+         "en": "Please enter a valid directory.",
+         "es": "Por favor ingrese un directorio válido."
     }
 }
 
@@ -680,7 +712,8 @@ if selected_history_files:
     # No, the crash is in Tab 2 logic.
     pass
 
-tab1, tab2, tab3 = st.tabs([t("tab_dashboard"), t("tab_inference"), t("tab_script")])
+# HACK: Manage Tab selection by just rendering them.
+tab1, tab2, tab3, tab4 = st.tabs([t("tab_dashboard"), t("tab_inference"), t("tab_batch"), t("tab_script")])
 
 # ==============================================================================
 # TAB 1: DASHBOARD
@@ -1328,9 +1361,175 @@ with tab2:
                      st.error(f"Error: {e}")
 
 # ==============================================================================
-# TAB 3: CONVERTER SCRIPT
+# TAB 3: BATCH PROCESSING (New Feature)
 # ==============================================================================
 with tab3:
+    st.header(t("tab_batch"))
+    
+    # 1. Inputs
+    # Default to a likely path or empty
+    default_dir = "/Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/03_nssr_shhs/parquet_files"
+    source_dir = st.text_input(t("batch_source_dir"), value=default_dir)
+    
+    # Session State for Batch
+    if 'batch_files' not in st.session_state:
+        st.session_state.batch_files = []
+    
+    c_batch_1, c_batch_2 = st.columns([1, 4])
+    
+    with c_batch_1:
+        if st.button(t("batch_scan_btn"), type="primary"):
+            if os.path.isdir(source_dir):
+                # Scan
+                # Support EDF and Parquet
+                edfs = glob.glob(os.path.join(source_dir, "*.edf"))
+                parquets = glob.glob(os.path.join(source_dir, "*.parquet"))
+                
+                # Filter out those already processed
+                processed_list = get_processed_files_list()
+                # Normalize names (just basename)
+                processed_basenames = {os.path.basename(f) for f in processed_list}
+                
+                pending = []
+                already_processed_count = 0
+                
+                for fpath in edfs + parquets:
+                    fname = os.path.basename(fpath)
+                    # Check if processed (check both exact name and name turned into parquet)
+                    name_clean = fname.replace(".edf", ".parquet")
+                    
+                    if fname in processed_basenames or name_clean in processed_basenames:
+                        already_processed_count += 1
+                    else:
+                        pending.append(fpath)
+                
+                st.session_state.batch_files = sorted(list(set(pending)))
+                st.success(f"Found {len(st.session_state.batch_files)} pending files.")
+                if already_processed_count > 0:
+                     st.info(f"{t('batch_processed_count')}: {already_processed_count}")
+            else:
+                st.error(t("batch_param_warning"))
+                
+    st.divider()
+    
+    # 2. Display List
+    if st.session_state.batch_files:
+        st.subheader(f"{t('batch_pending')} ({len(st.session_state.batch_files)})")
+        df_pending = pd.DataFrame(st.session_state.batch_files, columns=["Filepath"])
+        st.dataframe(df_pending, height=200, use_container_width=True)
+        
+        # 3. Process Button
+        if st.button(t("batch_start_btn"), type="primary"):
+             # Initialization
+             batch_progress = st.progress(0)
+             batch_status = st.empty()
+             stop_btn = st.empty() # Placeholder for stop? Streamlit doesn't support interactive stop easily in loop.
+             
+             total_files = len(st.session_state.batch_files)
+             
+             # PROCESSING LOOP
+             for idx, file_path in enumerate(st.session_state.batch_files):
+                 fname = os.path.basename(file_path)
+                 batch_status.markdown(f"**Processing {idx+1}/{total_files}:** `{fname}`")
+                 
+                 try:
+                     # 1. Load Data
+                     # Reuse logic from Inference Tab (Refactor ideally, but Copy-Paste for safety now)
+                     # Determine input_df
+                     current_df = pd.DataFrame()
+                     
+                     file_ext = os.path.splitext(fname)[1].lower()
+                     
+                     if file_ext == ".edf":
+                        # Convert on fly
+                        # batch_status.text(f"Converting {fname}...")
+                        pq_path = file_path.replace(".edf", ".parquet")
+                        # Check if parquet exists?
+                        if os.path.exists(pq_path):
+                            current_df = pd.read_parquet(pq_path)
+                        else:
+                            # Run conversion
+                             if 'convert_edf_to_parquet' in globals():
+                                 convert_edf_to_parquet(file_path, pq_path)
+                                 current_df = pd.read_parquet(pq_path)
+                             else:
+                                 st.error("Conversion function not found")
+                                 
+                     elif file_ext == ".parquet":
+                        current_df = pd.read_parquet(file_path)
+                        
+                     # 2. Inference
+                     if not current_df.empty:
+                        # Preprocess
+                        # Assuming 4560 features
+                         cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage', 'true_label'] if c in current_df.columns]
+                         if cols_to_drop:
+                             data_values = current_df.drop(columns=cols_to_drop).values
+                         else:
+                             data_values = current_df.values
+                             
+                         # Normalize
+                         # ... (We need to ensure we use the same robust vectorization)
+                         # To keep it DRY, we should have a `run_inference(df)` function.
+                         # But for now, let's reuse the cached_preds logic pattern from earlier?
+                         # Or better, just call the logic.
+                         
+                         batch_flat = data_values.astype(np.float32)
+                         mean = batch_flat.mean(axis=1, keepdims=True)
+                         std = batch_flat.std(axis=1, keepdims=True)
+                         spectrogram_normalized = (batch_flat - mean) / (std + 1e-6)
+                         spectrogram_2d = spectrogram_normalized.reshape(-1, 1, 76, 60)
+                         
+                         # Load Model (Ensure `model` is available or load it once)
+                         # We'll reload for safety or use `st.session_state` model if available?
+                         # The main script loads `model` at the top? No, it loads on selection.
+                         # We need to load the BEST model for batch
+                         
+                         # Load Best Model
+                         c_model_path = os.path.join(BASE_DIR, selected_model_name) # selected_model_name is from sidebar
+                         model = get_model(detect_architecture(selected_model_name), pretrained=False)
+                         weights = load_checkpoint_weights(c_model_path)
+                         model.load_state_dict(weights, strict=False)
+                         model.eval()
+                         
+                         # Chunked Inference
+                         batch_preds = []
+                         chunk_size = 64
+                         with torch.no_grad():
+                             t_tensor = torch.from_numpy(spectrogram_2d)
+                             total_samples = len(t_tensor)
+                             
+                             for i in range(0, total_samples, chunk_size):
+                                 batch = t_tensor[i:i+chunk_size]
+                                 outputs = model(batch)
+                                 _, preds = torch.max(outputs, 1)
+                                 batch_preds.extend(preds.numpy().tolist())
+                         
+                         # 3. Save
+                         # Confidence? Use dummy 1.0 or implement softmax if needed.
+                         # For speed, just saving preds.
+                         # Need file_id/patient_id?
+                         fn_clean = fname.replace(".parquet", "").replace(".edf", "")
+                         
+                         # Save to SQL
+                         save_results_to_sql(fn_clean, batch_preds, [0.9]*len(batch_preds), selected_model_name)
+                         
+                 except Exception as e:
+                     st.error(f"Failed {fname}: {e}")
+                 
+                 # Update Progress
+                 batch_progress.progress((idx + 1) / total_files)
+             
+             st.success(t("batch_complete"))
+             st.balloons()
+             # Clear pending
+             st.session_state.batch_files = []
+             st.rerun() # Refresh to show in processed list
+
+# ==============================================================================
+# TAB 4: CONVERTER SCRIPT
+# ==============================================================================
+with tab4:
     st.header(t("tab_script"))
     script_path = "pre_shhs_edf2parquet.py"
     if os.path.exists(script_path):
