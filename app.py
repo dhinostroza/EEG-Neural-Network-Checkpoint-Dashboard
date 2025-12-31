@@ -699,17 +699,19 @@ with tab2:
                     info_c1, info_c2, info_c3 = st.columns(3)
                     
                     with info_c1:
-                        st.markdown(f"**{t('date_label')}:** {selected_model_row.get('date', 'N/A')}")
-                        st.markdown(f"**{t('arch')}:** {selected_model_row.get('model_architecture', 'Unknown')}")
+                        # Merged into one markdown for tighter spacing
+                        st.markdown(f"**{t('date_label')}:** {selected_model_row.get('date', 'N/A')}  \n"
+                                    f"**{t('arch')}:** {selected_model_row.get('model_architecture', 'Unknown')}")
                     
                     with info_c2:
-                        st.markdown(f"**{t('time_label')}:** {selected_model_row.get('time', 'N/A')}")
                         v_loss = selected_model_row.get('val_loss', 0)
-                        st.markdown(f"**{t('val_loss')}:** {v_loss:.4f}" if isinstance(v_loss, (int, float)) else f"**{t('val_loss')}:** {v_loss}")
+                        v_loss_str = f"{v_loss:.4f}" if isinstance(v_loss, (int, float)) else f"{v_loss}"
+                        st.markdown(f"**{t('time_label')}:** {selected_model_row.get('time', 'N/A')}  \n"
+                                    f"**{t('val_loss')}:** {v_loss_str}")
                         
                     with info_c3:
-                         st.markdown(f"**{t('files_label')}:** {n_files}")
-                         st.markdown(f"**{t('params_label')}:** {lr}, {weights}, {workers}")
+                         st.markdown(f"**{t('files_label')}:** {n_files}  \n"
+                                     f"**{t('params_label')}:** {lr}, {weights}, {workers}")
                     
                     st.divider()
                  else:
