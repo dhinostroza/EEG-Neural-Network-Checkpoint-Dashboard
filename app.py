@@ -526,16 +526,15 @@ with tab1:
 # TAB 2: INFERENCE
 # ==============================================================================
 with tab2:
-    # Create layout: 3 Columns
-    # Col 1: File List (Increased to ~9% to fit header)
-    # Col 2: Uploader (~17%)
-    # Col 3: Results (Rest ~74%)
-    col_history, col_upload, col_results = st.columns([0.9, 1.7, 7.4])
+    # Create layout: 2 Main Columns
+    # Col 1: Sidebar-like File List (Full height)
+    # Col 2: Main Content (Uploader/Model on top, Results below)
+    col_left_sidebar, col_main_content = st.columns([1.0, 9.0])
     
     selected_history_files = []
     
-    # --- COLUMN 1: History List ---
-    with col_history:
+    # --- COLUMN 1: LEFT SIDEBAR (History) ---
+    with col_left_sidebar:
         # Standardized Header
         st.markdown(f"**{t('history_label')}**")
         
@@ -544,7 +543,7 @@ with tab2:
              # Remove .parquet extension for display
              df_files["display_name"] = df_files["filename"].str.replace(".parquet", "", regex=False)
              
-             # Calculate height for ~7 rows. 35px per row + header. ~250px.
+             # Increased height to act as a sidebar (700px)
              event = st.dataframe(
                 df_files,
                 column_config={
@@ -553,7 +552,7 @@ with tab2:
                 },
                 width="stretch",
                 hide_index=True,
-                height=250, 
+                height=700, 
                 on_select="rerun",
                 selection_mode="multi-row",
                 key="history_list_main" # Unique key
@@ -564,80 +563,85 @@ with tab2:
         else:
             st.info("-")
 
-    # --- COLUMN 2: Uploader ---
-    with col_upload:
-        # Standardized Header
-        st.markdown(f"**{t('upload_label')}**")
-        uploaded_files = st.file_uploader(
-            label=t("upload_label"),
-            type=["parquet", "edf"],
-            accept_multiple_files=True,
-            key="uploader_main",
-            label_visibility="collapsed"
-        )
+    # --- COLUMN 2: MAIN CONTENT ---
+    with col_main_content:
+        # Top Row: Uploader and Model Selector
+        col_top_upload, col_top_model = st.columns([1.8, 7.2])
         
-    # --- COLUMN 3: Results & Model Info ---
-    with col_results:
-        # Select Model Logic (Default to Best)
-        if df.empty:
-             st.warning(t("no_models_err"))
-             selected_model_name = None
-        else:
-             valid_df = df[df['val_loss'].notna()].copy()
-             if not valid_df.empty:
-                # Identify best model for default
-                best_model_idx = valid_df['val_loss'].idxmin()
-                best_model_name = valid_df.loc[best_model_idx, 'filename']
-                
-                # Model Selector
-                model_options = valid_df['filename'].tolist()
-                # Find index of best model in the list
-                default_index = model_options.index(best_model_name) if best_model_name in model_options else 0
-                
-                # Standardized Header
-                st.markdown(f"**{t('select_model_label')}**")
-                
-                selected_model_name = st.selectbox(
-                    label=t("select_model_label"),
-                    options=model_options,
-                    index=default_index,
-                    key="model_selector",
-                    label_visibility="collapsed"
-                )
-                
-                # Get the row for the SELECTED model
-                selected_model_row = df[df['filename'] == selected_model_name].iloc[0]
-                model_meta = selected_model_row # Update global meta reference
-                
-                # Restore detailed info
-                st.markdown(f"**Model: {selected_model_name}**")
-                
-                # Extract meta
-                lr = selected_model_row.get('lr', 'N/A')
-                wrs = selected_model_row.get('weighted_sampler', False)
-                weights = "WRS: On" if wrs else "WRS: Off"
-                workers = f"Workers: {selected_model_row.get('workers', 0)}"
-                n_files = selected_model_row.get('trained_on_files', 0)
-                
-                info_c1, info_c2, info_c3 = st.columns(3)
-                
-                with info_c1:
-                    st.markdown(f"**{t('date_label')}:** {selected_model_row.get('date', 'N/A')}")
-                    st.markdown(f"**{t('arch')}:** {selected_model_row.get('model_architecture', 'Unknown')}")
-                
-                with info_c2:
-                    st.markdown(f"**{t('time_label')}:** {selected_model_row.get('time', 'N/A')}")
-                    v_loss = selected_model_row.get('val_loss', 0)
-                    st.markdown(f"**{t('val_loss')}:** {v_loss:.4f}" if isinstance(v_loss, (int, float)) else f"**{t('val_loss')}:** {v_loss}")
+        # --- Top Left: Uploader ---
+        with col_top_upload:
+            st.markdown(f"**{t('upload_label')}**")
+            uploaded_files = st.file_uploader(
+                label=t("upload_label"),
+                type=["parquet", "edf"],
+                accept_multiple_files=True,
+                key="uploader_main",
+                label_visibility="collapsed"
+            )
+            
+        # --- Top Right: Model Selection ---
+        with col_top_model:
+            # Select Model Logic (Default to Best)
+            if df.empty:
+                 st.warning(t("no_models_err"))
+                 selected_model_name = None
+            else:
+                 valid_df = df[df['val_loss'].notna()].copy()
+                 if not valid_df.empty:
+                    # Identify best model for default
+                    best_model_idx = valid_df['val_loss'].idxmin()
+                    best_model_name = valid_df.loc[best_model_idx, 'filename']
                     
-                with info_c3:
-                     st.markdown(f"**{t('files_label')}:** {n_files}")
-                     st.markdown(f"**{t('params_label')}:** {lr}, {weights}, {workers}")
-                
-                st.divider()
-             else:
-                selected_model_name = None
+                    # Model Selector
+                    model_options = valid_df['filename'].tolist()
+                    # Find index of best model in the list
+                    default_index = model_options.index(best_model_name) if best_model_name in model_options else 0
+                    
+                    # Standardized Header
+                    st.markdown(f"**{t('select_model_label')}**")
+                    
+                    selected_model_name = st.selectbox(
+                        label=t("select_model_label"),
+                        options=model_options,
+                        index=default_index,
+                        key="model_selector",
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Get the row for the SELECTED model
+                    selected_model_row = df[df['filename'] == selected_model_name].iloc[0]
+                    model_meta = selected_model_row # Update global meta reference
+                    
+                    # Restore detailed info
+                    st.markdown(f"**Model: {selected_model_name}**")
+                    
+                    # Extract meta
+                    lr = selected_model_row.get('lr', 'N/A')
+                    wrs = selected_model_row.get('weighted_sampler', False)
+                    weights = "WRS: On" if wrs else "WRS: Off"
+                    workers = f"Workers: {selected_model_row.get('workers', 0)}"
+                    n_files = selected_model_row.get('trained_on_files', 0)
+                    
+                    info_c1, info_c2, info_c3 = st.columns(3)
+                    
+                    with info_c1:
+                        st.markdown(f"**{t('date_label')}:** {selected_model_row.get('date', 'N/A')}")
+                        st.markdown(f"**{t('arch')}:** {selected_model_row.get('model_architecture', 'Unknown')}")
+                    
+                    with info_c2:
+                        st.markdown(f"**{t('time_label')}:** {selected_model_row.get('time', 'N/A')}")
+                        v_loss = selected_model_row.get('val_loss', 0)
+                        st.markdown(f"**{t('val_loss')}:** {v_loss:.4f}" if isinstance(v_loss, (int, float)) else f"**{t('val_loss')}:** {v_loss}")
+                        
+                    with info_c3:
+                         st.markdown(f"**{t('files_label')}:** {n_files}")
+                         st.markdown(f"**{t('params_label')}:** {lr}, {weights}, {workers}")
+                    
+                    st.divider()
+                 else:
+                    selected_model_name = None
 
+        # --- RESULTS AREA (Full Main Column Width) ---
         # Auto-trigger analysis
         # Only run if files are present AND model is selected
         if (uploaded_files or selected_history_files) and selected_model_name:
@@ -656,6 +660,7 @@ with tab2:
      
              # Iterate over each file
              for i, uploaded_file in enumerate(files_to_process):
+
                  # Header instead of expander for cleaner look
                  st.divider()
                  st.markdown(f"### 📄 {uploaded_file.name}")
