@@ -56,6 +56,48 @@ class CheckpointAnalyzer:
             meta["pl_version"] = checkpoint.get('pytorch-lightning_version', 'N/A')
             meta["epoch"] = checkpoint.get('epoch', -1)
             
+            # --- EXTRACT FROM FILENAME (User Request) ---
+            # e.g. 2025-09-04_05-36_best-model_convnext_base_2000files_lr2e-05_cwn1-8.0_workers2.ckpt
+            try:
+                # Date: YYYY-MM-DD
+                date_match = re.search(r'(\d{4}-\d{2}-\d{2})', filename)
+                if date_match:
+                    meta["date"] = date_match.group(1)
+                
+                # Time: HH-MM (optionally followed by _)
+                time_match = re.search(r'_(\d{2}-\d{2})', filename)
+                if time_match:
+                    meta["time"] = time_match.group(1).replace("-", ":")
+
+                # Workers
+                workers_match = re.search(r'workers(\d+)', filename)
+                if workers_match:
+                    meta["workers"] = int(workers_match.group(1))
+
+                # Files
+                files_match = re.search(r'(\d+)files', filename)
+                if files_match:
+                    meta["trained_on_files"] = int(files_match.group(1))
+
+                # LR
+                lr_match = re.search(r'lr([\deE\-\.]+)', filename)
+                if lr_match:
+                     meta["lr"] = lr_match.group(1)
+
+                # CW (Class Weights / Weighted Sampler)
+                if "cwn" in filename or "wrs" in filename:
+                    meta["weighted_sampler"] = True
+                
+                # Architecture from filename fallback
+                if meta["model_architecture"] == "Unknown":
+                    for arch in ["convnext_base", "convnext_small", "convnext_tiny", "resnet18", "resnet50"]:
+                        if arch in filename:
+                            meta["model_architecture"] = arch
+                            break
+            except Exception as parse_e:
+                print(f"Warning: Filename parsing error for {filename}: {parse_e}")
+
+
             # Count params
             state_dict = checkpoint.get('state_dict', {})
             total_params = 0
