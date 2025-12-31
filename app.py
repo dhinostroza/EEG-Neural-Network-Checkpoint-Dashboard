@@ -1353,11 +1353,18 @@ with tab2:
                     line_pred = base.mark_line(interpolate='step', color='#2196f3', size=2).encode(
                        y=alt.Y('predicted_mid', title="Stage", scale=alt.Scale(domain=[0, 4])),
                     )
-                    line_gt = base.mark_line(interpolate='step', strokeDash=[5, 5], color='#4caf50', size=2).encode(
-                       y=alt.Y(gt_col, title="Stage"),
-                    )
-                    st.altair_chart((line_gt + line_pred).properties(height=300), width="stretch")
-                    st.caption("Green (Dashed): Ground Truth | Blue (Solid): Predicted Model Output")
+                    
+                    chart = line_pred
+                    if gt_col:
+                        line_gt = base.mark_line(interpolate='step', strokeDash=[5, 5], color='#4caf50', size=2).encode(
+                           y=alt.Y(gt_col, title="Stage"),
+                        )
+                        chart = line_gt + chart
+                        st.caption("Green (Dashed): Ground Truth | Blue (Solid): Predicted Model Output")
+                    else:
+                        st.caption("Blue (Solid): Predicted Model Output (No Ground Truth Available)")
+                        
+                    st.altair_chart(chart.properties(height=300), width="stretch")
                  except Exception as e:
                      st.error(f"Error: {e}")
 
