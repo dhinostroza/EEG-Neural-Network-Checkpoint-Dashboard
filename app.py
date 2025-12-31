@@ -241,6 +241,21 @@ def inject_custom_css():
          /* Browse Button (This is harder to target perfectly without hiding interaction, be careful) */
          /* Usually better to leave 'Browse files' or accept it, but let's try to override if feasible. */
          /* The button is inside generated shadow DOM or complex sturcture sometimes. Skipping button to avoid breakage. */
+         
+         /* Force scrollbars to be visible (Mac auto-hide override) */
+         ::-webkit-scrollbar {
+            -webkit-appearance: none;
+            width: 7px;
+            height: 7px;
+         }
+         ::-webkit-scrollbar-thumb {
+            border-radius: 4px;
+            background-color: rgba(0, 0, 0, 0.5); /* Visible grey */
+            box-shadow: 0 0 1px rgba(255, 255, 255, .5);
+         }
+         ::-webkit-scrollbar-track {
+             background-color: transparent;
+         }
         </style>
     """, unsafe_allow_html=True)
 
