@@ -261,25 +261,26 @@ def inject_custom_css():
          
          /* Force scrollbars to be visible (Mac auto-hide override) */
          /* Webkit browsers (Chrome, Safari) */
+         /* Force scrollbars to be visible (Mac auto-hide override) */
+         /* Webkit browsers (Chrome, Safari) */
          ::-webkit-scrollbar {
             -webkit-appearance: none;
             width: 8px !important;
             height: 8px !important;
-            display: block !important;
          }
+         
          ::-webkit-scrollbar-thumb {
             border-radius: 4px;
             background-color: rgba(100, 100, 100, 0.5) !important; /* Visible grey */
             box-shadow: 0 0 1px rgba(255, 255, 255, .5);
          }
+         
          ::-webkit-scrollbar-track {
              background-color: transparent;
          }
          
-         /* Target specific scrollable containers if needed */
-         [data-testid="stVerticalBlock"] > div {
-             overflow-y: auto !important;
-         }
+         /* Remove the aggressive selector that was forcing scrollbars on titles/columns */
+         /* The st.container(height=...) handles overflow automatically */
          
          /* Firefox */
          * {
