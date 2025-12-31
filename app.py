@@ -846,20 +846,44 @@ with tab2:
                         st.write(f"**{t('params_label')}**: {model_meta.get('params_m', 0):.2f} M")
                         st.caption(t("context_caption"))
                     
-                    col_res1, col_res2 = st.columns(2)
-                    with col_res1:
-                        st.dataframe(input_df[['predicted_label', 'predicted_mid']].head(10), use_container_width=True)
+                    # --- Detailed Results Tables ---
+                    st.divider()
+                    st.markdown(f"### {t('results_title') if 'results_title' in TRANSLATIONS else 'Detailed Results'}")
+                    
+                    # 1. Prediction Results Table
+                    st.markdown(f"#### {t('pred_table_title') if 'pred_table_title' in TRANSLATIONS else 'Model Predictions'}")
+                    
+                    # Prepare a clean display dataframe
+                    # Add Epoch column for clarity
+                    input_df['Epoch'] = range(len(input_df))
+                    
+                    # Reorder columns to show important info first
+                    display_cols = ['Epoch', 'predicted_label', 'predicted_mid']
+                    
+                    # If there are other useful columns in input_df (like timestamps), add them here
+                    # For now we stick to what we know exists
+                    
+                    st.dataframe(
+                        input_df[display_cols], 
+                        use_container_width=True, 
+                        height=300,
+                        column_config={
+                            "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
+                            "predicted_label": st.column_config.TextColumn("Predicted Stage"),
+                            "predicted_mid": st.column_config.NumberColumn("Class Index")
+                        }
+                    )
+                    
+                    # Download Button (Full CSV)
+                    csv = input_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label=t("download_results"),
+                        data=csv,
+                        file_name=f"predictions_{uploaded_file.name}.csv",
+                        mime="text/csv",
+                        key=f"download_{i}"
+                    )
                         
-                    with col_res2:
-                        csv = input_df.to_csv(index=False).encode('utf-8')
-                        st.download_button(
-                            label=t("download_results"),
-                            data=csv,
-                            file_name=f"predictions_{uploaded_file.name}.csv",
-                            mime="text/csv",
-                            key=f"download_{i}" # Unique key for each button
-                        )
-
                     # ----------------------------------------------------------------------
                     # GROUND TRUTH COMPARISON
                     # ----------------------------------------------------------------------
@@ -888,7 +912,7 @@ with tab2:
                             # Layout for Charts
                             c_charts = st.container()
                             
-                            # 1. Side-by-Side Distribution
+                            # 1. Side-by-Side Distribution Chart
                             st.markdown(f"#### {t('class_dist_comp') if 'class_dist_comp' in TRANSLATIONS else 'Class Distribution: Actual vs Predicted'}")
                             
                             gt_counts = input_df.loc[valid_mask, 'true_label'].value_counts().reset_index()
@@ -902,19 +926,39 @@ with tab2:
                             combined_counts = pd.concat([gt_counts, pred_counts])
                             
                             chart_comp = alt.Chart(combined_counts).mark_bar().encode(
-                                x=alt.X(t("col_stage"), sort=['W', 'N1', 'N2', 'N3', 'REM']), # Sort order
+                                x=alt.X(t("col_stage"), sort=['W', 'N1', 'N2', 'N3', 'REM']), 
                                 y=alt.Y("count", title=t("col_count")),
-                                color=alt.Color("Type", scale={"range": ['#4caf50', '#2196f3']}), # Green (GT) vs Blue (Pred)
+                                color=alt.Color("Type", scale={"range": ['#4caf50', '#2196f3']}), 
                                 column=alt.Column("Type", title=None),
                                 tooltip=[t("col_stage"), "count", "Type"]
                             ).properties(height=250)
                             
                             st.altair_chart(chart_comp, width="stretch")
                             
-                            # 2. Hypnogram Comparison
+                            # 2. Detailed Comparison Table (Replacing simple hypnogram for now if table is preferred, or adding potential)
+                            st.markdown(f"#### Detailed Comparison Table")
+                            
+                            comp_df = pd.DataFrame({
+                                "Epoch": input_df['Epoch'],
+                                "Ground Truth": input_df['true_label'],
+                                "Predicted": input_df['predicted_label'],
+                                "Match": input_df[gt_col] == input_df['predicted_mid']
+                            })
+                            
+                            st.dataframe(
+                                comp_df,
+                                use_container_width=True,
+                                height=400,
+                                column_config={
+                                    "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
+                                    "Match": st.column_config.CheckboxColumn("Match")
+                                }
+                            )
+
+                            # 3. Hypnogram Comparison
                             st.markdown(f"#### {t('hypno_comp') if 'hypno_comp' in TRANSLATIONS else 'Hypnogram Comparison (First 300 Epochs)'}")
                             
-                            subset = input_df.head(300).reset_index()
+                            subset = input_df.head(300).reset_index(drop=True).reset_index()
                             
                             base = alt.Chart(subset).encode(x=alt.X('index', title="Epoch"))
                             
@@ -927,7 +971,6 @@ with tab2:
                             )
                             
                             st.altair_chart((line_gt + line_pred).properties(height=300), width="stretch")
-                            
                             st.caption("Green (Dashed): Ground Truth | Blue (Solid): Predicted Model Output")
                  except Exception as e:
                      st.error(f"Error: {e}")
