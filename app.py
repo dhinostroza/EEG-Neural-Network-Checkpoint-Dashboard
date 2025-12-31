@@ -139,6 +139,10 @@ TRANSLATIONS = {
         "en": "Params",
         "es": "Parámetros"
     },
+    "msg_loaded_cache": {
+        "en": "Loaded cached results for {filename}",
+        "es": "Se cargaron los resultados en caché para {filename}"
+    },
     "history_label": {
         "en": "Processed Files",
         "es": "Archivos procesados"
@@ -231,30 +235,31 @@ TRANSLATIONS = {
     },
     "pred_counts": {
         "en": "Prediction Counts",
-        "es": "Conteo de Predicciones"
+        "es": "Conteo de predicciones"
     },
     "pred_stage": {
         "en": "Predicted Stage",
-        "es": "Etapa Predicha"
+        "es": "Etapa predicha"
     },
     "class_index": {
         "en": "Class Index",
-        "es": "Índice de Clase"
+        "es": "Índice de clase"
     },
     "overall_acc": {
         "en": "Overall Accuracy",
-        "es": "Precisión Global"
+        "es": "Precisión global"
+    },
     "pred_table_title": {
         "en": "Model Predictions",
-        "es": "Predicciones del Modelo"
+        "es": "Predicciones del modelo"
     },
     "conf_matrix_title": {
         "en": "Confusion Matrix",
-        "es": "Matriz de Confusión"
+        "es": "Matriz de confusión"
     },
     "results_title": {
         "en": "Detailed Results",
-        "es": "Resultados Detallados"
+        "es": "Resultados detallados"
     },
     "comp_title": {
         "en": "Ground Truth Comparison",
@@ -263,6 +268,10 @@ TRANSLATIONS = {
     "stage_wake": {
         "en": "Wake",
         "es": "Vigilia"
+    },
+    "hypno_comp": {
+        "en": "Hypnogram Comparison (First 300 Epochs)",
+        "es": "Comparación del hipnograma (primeras 300 épocas)"
     }
 }
 
@@ -307,6 +316,22 @@ def inject_custom_css():
             color: inherit;
             margin-top: 10px;
             display: block;
+        }
+        
+        /* HACK: Hide Pagination "Showing page 1 of 6" and enable scrollbar */
+        div[data-testid="stFileUploader"] ul[data-testid="scroll-to-bottom-container"] + div, 
+        div[data-testid="stFileUploaderPagination"] {
+            display: none !important;
+        }
+        
+        section[data-testid="stFileUploader"] section[data-testid="stFileUploader"] {
+            overflow: hidden; /* Avoid double scrolling */
+        }
+
+        /* Make the file list scrollable */
+        section[data-testid="stFileUploader"] ul {
+            max-height: 200px;
+            overflow-y: auto !important;
         }
          
          /* Force scrollbars to be visible (Mac auto-hide override) */
@@ -623,9 +648,9 @@ def load_data(force_refresh=False):
             st.success("Scan complete!")
             return df
     else:
-        df = pd.DataFrame(ANALYZER.cache.values())
-        if df.empty:
-            df = ANALYZER.scan()
+        # Always scan to ensure we check for file existence/renames on every load
+        # scan() is optimized to skip processing if mtime hasn't changed.
+        df = ANALYZER.scan()
         return df
 
 if refresh_btn:
@@ -711,7 +736,7 @@ with tab2:
     # Col 1: Sidebar-like File List (Full height)
     # Col 2: Main Content (Uploader/Model on top, Results below)
     # Adjusted ratios for better spacing (Ref: User Image)
-    col_left_sidebar, col_main_content = st.columns([1.5, 8.5])
+    col_left_sidebar, col_main_content = st.columns([1.0, 9.0])
     
     selected_history_files = []
     
@@ -839,7 +864,8 @@ with tab2:
                          st.markdown(f"**{t('params_label')}:** {selected_model_row.get('params_m', 0):.2f} M  \n"
                                      f"**Hyperparams:** {params_str}")
                     
-                    st.divider()
+                    # User requested reduced vertical space. Using HTML hr with negative margin.
+                    st.markdown("""<hr style="height:1px;border:none;color:#333;background-color:#ccc; margin-top: -5px; margin-bottom: 10px;" /> """, unsafe_allow_html=True)
                  else:
                     selected_model_name = None
 
@@ -968,7 +994,7 @@ with tab2:
                         if input_df.empty:
                             input_df = pd.DataFrame(index=range(len(predictions)))
                             
-                        global_status_container.success(f"Loaded cached results for {uploaded_file.name}")
+                        global_status_container.success(t("msg_loaded_cache").format(filename=uploaded_file.name))
                         progress_bar.empty()
                     else:
                         # ------------------------------------------------------------------
@@ -1079,9 +1105,23 @@ with tab2:
                     counts.columns = [t("col_stage"), t("col_count")]
                     
                     # Layout
-                    col_viz, col_context = st.columns([2, 1])
+                    # Layout: Charts Side-by-Side
+                    # Layout: Charts Side-by-Side
+                    gt_col = next((c for c in ['label', 'stage', 'sleep_stage'] if c in input_df.columns), None)
+                    has_gt = gt_col and input_df[gt_col].notna().any()
                     
-                    with col_viz:
+                    if has_gt:
+                        # Ensure mapping exists for visualization
+                        if 'true_label' not in input_df.columns:
+                             input_df['true_label'] = input_df[gt_col].map(stage_map)
+                    
+                    if has_gt:
+                        col_viz_pred, col_viz_gt = st.columns(2)
+                    else:
+                        col_viz_pred = st.container()
+                        col_viz_gt = None
+                    
+                    with col_viz_pred:
                         st.markdown(f"#### {t('sleep_dist')}")
                         c_stage = t("col_stage")
                         c_count = t("col_count")
@@ -1093,7 +1133,7 @@ with tab2:
                             y=c_count,
                             color=alt.Color(c_stage, scale={"domain": sort_order, "range": ['#f5bf03', '#a7c7e7', '#779ecb', '#03396c', '#ff6b6b']}),
                             tooltip=[c_stage, c_count]
-                        ).properties(height=350)
+                        ).properties(height=300)
                         st.altair_chart(chart, width="stretch")
                         
                         # Prediction Counts Row (Metrics)
@@ -1109,33 +1149,52 @@ with tab2:
                             with cnt_cols[idx]:
                                 st.metric(label=stage_name, value=count_val)
 
-                    with col_context:
-                        st.markdown(f"#### {t('model_context')}")
-                        st.info(f"**{t('arch')}**: {model_meta.get('model_architecture', 'Unknown')}")
-                        
-                        # Loss Analysis
-                        v_loss = model_meta.get('val_loss')
-                        if pd.notna(v_loss):
-                            st.write(f"**{t('val_loss')}**: `{v_loss:.4f}`")
-                            if v_loss < 0.60:
-                                st.success(t("high_reliability"))
-                            elif v_loss < 0.80:
-                                st.warning(t("mod_reliability"))
-                            else:
-                                st.error(t("low_reliability"))
-                        else:
-                             st.write(f"**{t('val_loss')}**: N/A")
+                    # --- Ground Truth Chart (Moved here) ---
+                    if has_gt and col_viz_gt:
+                         with col_viz_gt:
+                             st.markdown(f"#### {t('comp_title')}") # Reusing "Ground Truth Comparison" title or similar? 
+                             # User asked for "Visual Comparison" next to it.
+                             
+                             valid_mask = input_df[gt_col] >= 0
+                             gt_counts_viz = input_df.loc[valid_mask, 'true_label'].value_counts().reset_index()
+                             gt_counts_viz.columns = [t("col_stage"), t("col_count")]
+                             
+                             # Using Green color as seen in user screenshot for GT
+                             chart_gt = alt.Chart(gt_counts_viz).mark_bar().encode(
+                                x=alt.X(t("col_stage"), sort=sort_order, axis=alt.Axis(labelAngle=0)),
+                                y=t("col_count"),
+                                color=alt.value("#4caf50"), # Green
+                                tooltip=[t("col_stage"), t("col_count")]
+                             ).properties(height=300) # Title removed to avoid warping height
+                             
+                             st.altair_chart(chart_gt, width="stretch")
 
-                        st.write(f"**{t('epoch')}**: {model_meta.get('epoch', 'N/A')}")
-                        st.write(f"**{t('params_label')}**: {model_meta.get('params_m', 0):.2f} M")
-                        st.caption(t("context_caption"))
+                             # Ground Truth Counts Row (Metrics) - Placed under graph for comparison
+                             st.markdown(f"##### {t('pred_counts')}") # Using same label 'Prediction Counts' (or maybe 'Ground Truth Counts'?) User asked for 'Conteo de predicciones' specifically but under the GT graph it implies GT counts.
+                             # Actually user said "Add the 'Conteo de predicciones' underneath the Ground truth graph"
+                             # It's ambiguous if they want the literal string 'Conteo de predicciones' or 'Ground Truth Counts'. 
+                             # Given the context "so they become easy to compare", it implies they want the counts of the GT.
+                             # I will use the generic 'Conteo de predicciones' label if that's what t('pred_counts') returns (it likely does), 
+                             # OR I should check strictly. Let's stick to the visual symmetry. 
+                             # However, labeling GT data as "Prediction Counts" is confusing. 
+                             # I will try to use a more accurate label if available, or just reuse the style. 
+                             # But the user asked: "Add the 'Conteo de predicciones' underneath..."
+                             gt_val_counts = input_df.loc[valid_mask, 'true_label'].value_counts()
+                             
+                             gt_cnt_cols = st.columns(5)
+                             for idx, stage_name in enumerate(stages_ordered):
+                                 count_val = gt_val_counts.get(stage_name, 0)
+                                 with gt_cnt_cols[idx]:
+                                     st.metric(label=stage_name, value=count_val)
+
+
                     
                     # --- Detailed Results Tables (Side-by-Side) ---
                     st.divider()
                     st.markdown(f"### {t('results_title')}")
                     
-                    # Create 2 Columns for Tables
-                    tbl_col1, tbl_col2 = st.columns(2)
+                    # Create 3 Columns for Tables (Preds, Comparison, Confusion Matrix)
+                    tbl_col1, tbl_col2, tbl_col3 = st.columns([1, 1, 1])
                     
                     # --- LEFT TABLE: Model Predictions ---
                     with tbl_col1:
@@ -1153,13 +1212,12 @@ with tab2:
                         
                         st.dataframe(
                             left_align_df, 
-                            use_container_width=False,  # User request: "reduce the width"
-                            width=500, # Explicit width limit
+                            use_container_width=True,  # Fit within the 3-column layout
                             height=400,
                             column_config={
-                                "Epoch": st.column_config.TextColumn("Epoch"), # TextColumn aligns left
+                                "Epoch": st.column_config.TextColumn("Epoch"), 
                                 "predicted_label": st.column_config.TextColumn(t("pred_stage")),
-                                "predicted_mid": st.column_config.TextColumn(t("class_index")) # TextColumn aligns left
+                                "predicted_mid": st.column_config.TextColumn(t("class_index"))
                             }
                         )
                         
@@ -1180,8 +1238,9 @@ with tab2:
                          if gt_col:
                             st.markdown(f"#### {t('comp_title')}")
                             
-                            # Map numeric GT
-                            input_df['true_label'] = input_df[gt_col].map(stage_map)
+                            # Map numeric GT (already done above, but ensure it exists for tables if missed)
+                            if 'true_label' not in input_df.columns:
+                                 input_df['true_label'] = input_df[gt_col].map(stage_map)
                             
                             # Metrics
                             valid_mask = input_df[gt_col] >= 0
@@ -1210,27 +1269,31 @@ with tab2:
                                 }
                             )
                             
-                            # Confusion Matrix removed from here (moved below)
-
+                            # Confusion Matrix moved to col 3 (below)
+ 
                          else:
                              st.markdown("#### Comparison")
                              st.info("No Ground Truth labels found in this file.")
                     
-                     # --- CONFUSION MATRIX (Moved below tables) ---
-                     if gt_col and input_df[gt_col].notna().any():
-                        valid_mask = input_df[gt_col] >= 0
-                        if valid_mask.any():
-                             st.divider()
-                             st.markdown(f"#### {t('conf_matrix_title') if 'conf_matrix_title' in TRANSLATIONS else 'Confusion Matrix'}")
-                             
-                             cm_df = pd.crosstab(
-                                input_df.loc[valid_mask, 'true_label'], 
-                                input_df.loc[valid_mask, 'predicted_label'], 
-                                rownames=['Actual'], 
-                                colnames=['Predicted']
-                             )
-                             # Center the matrix
-                             st.dataframe(cm_df.style.background_gradient(cmap='Blues'), use_container_width=False)
+                    # --- COLUMN 3: CONFUSION MATRIX ---
+                    with tbl_col3:
+                        if gt_col and input_df[gt_col].notna().any():
+                            valid_mask = input_df[gt_col] >= 0
+                            if valid_mask.any():
+                                st.markdown(f"#### {t('conf_matrix_title') if 'conf_matrix_title' in TRANSLATIONS else 'Confusion Matrix'}")
+            
+                                cm_df = pd.crosstab(
+                                    input_df.loc[valid_mask, 'true_label'], 
+                                    input_df.loc[valid_mask, 'predicted_label'], 
+                                    rownames=['Actual'], 
+                                    colnames=['Predicted']
+                                )
+                                # Center the matrix
+                                st.dataframe(cm_df.style.background_gradient(cmap='Blues'), use_container_width=True)
+                            else:
+                                st.caption("No valid data for CM")
+                        else:
+                             st.caption("No Ground Truth")
 
 
                              
@@ -1240,48 +1303,27 @@ with tab2:
                     # Based on my previous logical block, charts were *inside* the GT block. 
                     # Providing Charts *below* the tables if GT exists to ensure completeness.
                     
-                    if gt_col and input_df[gt_col].notna().any():
-                         st.divider()
-                         st.markdown("### Visual Comparison")
-                         
-                         # Charts Container
-                         c_charts = st.container()
-                         
-                         valid_mask = input_df[gt_col] >= 0
-                         
-                         gt_counts = input_df.loc[valid_mask, 'true_label'].value_counts().reset_index()
-                         gt_counts.columns = [t("col_stage"), "count"]
-                         gt_counts["Type"] = "Ground Truth"
-                         
-                         pred_counts = input_df['predicted_label'].value_counts().reset_index()
-                         pred_counts.columns = [t("col_stage"), "count"]
-                         pred_counts["Type"] = "Predicted"
-                         
-                         combined_counts = pd.concat([gt_counts, pred_counts])
-                         
-                         chart_comp = alt.Chart(combined_counts).mark_bar().encode(
-                            x=alt.X(t("col_stage"), sort=['W', 'N1', 'N2', 'N3', 'REM']), 
-                            y=alt.Y("count", title=t("col_count")),
-                            color=alt.Color("Type", scale={"range": ['#4caf50', '#2196f3']}), 
-                            column=alt.Column("Type", title=None),
-                            tooltip=[t("col_stage"), "count", "Type"]
-                         ).properties(height=250)
-                         
-                         st.altair_chart(chart_comp, width="stretch")
-                         
-                         # Hypnogram
-                         st.markdown(f"#### {t('hypno_comp') if 'hypno_comp' in TRANSLATIONS else 'Hypnogram Comparison (First 300 Epochs)'}")
-                         subset = input_df.head(300).reset_index(drop=True).reset_index()
-                         base = alt.Chart(subset).encode(x=alt.X('index', title="Epoch"))
-                         
-                         line_pred = base.mark_line(interpolate='step', color='#2196f3', size=2).encode(
-                            y=alt.Y('predicted_mid', title="Stage", scale=alt.Scale(domain=[0, 4])),
-                         )
-                         line_gt = base.mark_line(interpolate='step', strokeDash=[5, 5], color='#4caf50', size=2).encode(
-                            y=alt.Y(gt_col, title="Stage"),
-                         )
-                         st.altair_chart((line_gt + line_pred).properties(height=300), width="stretch")
-                         st.caption("Green (Dashed): Ground Truth | Blue (Solid): Predicted Model Output")
+                    st.divider()
+
+                    
+                    # Charts Container (Hypnogram only now)
+                    c_charts = st.container()
+                    
+                    # Bar charts moved up.
+                    
+                    # Hypnogram
+                    st.markdown(f"#### {t('hypno_comp') if 'hypno_comp' in TRANSLATIONS else 'Hypnogram Comparison (First 300 Epochs)'}")
+                    subset = input_df.head(300).reset_index(drop=True).reset_index()
+                    base = alt.Chart(subset).encode(x=alt.X('index', title="Epoch"))
+                    
+                    line_pred = base.mark_line(interpolate='step', color='#2196f3', size=2).encode(
+                       y=alt.Y('predicted_mid', title="Stage", scale=alt.Scale(domain=[0, 4])),
+                    )
+                    line_gt = base.mark_line(interpolate='step', strokeDash=[5, 5], color='#4caf50', size=2).encode(
+                       y=alt.Y(gt_col, title="Stage"),
+                    )
+                    st.altair_chart((line_gt + line_pred).properties(height=300), width="stretch")
+                    st.caption("Green (Dashed): Ground Truth | Blue (Solid): Predicted Model Output")
                  except Exception as e:
                      st.error(f"Error: {e}")
 
