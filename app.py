@@ -244,10 +244,13 @@ TRANSLATIONS = {
     "overall_acc": {
         "en": "Overall Accuracy",
         "es": "Precisión Global"
-    },
     "pred_table_title": {
         "en": "Model Predictions",
         "es": "Predicciones del Modelo"
+    },
+    "conf_matrix_title": {
+        "en": "Confusion Matrix",
+        "es": "Matriz de Confusión"
     },
     "results_title": {
         "en": "Detailed Results",
@@ -1145,14 +1148,18 @@ with tab2:
                         # Display Columns
                         pred_display_cols = ['Epoch', 'predicted_label', 'predicted_mid']
                         
+                        # Prepare DF for Left Alignment (Cast to string) and Select Columns
+                        left_align_df = input_df[pred_display_cols].astype(str)
+                        
                         st.dataframe(
-                            input_df[pred_display_cols], 
-                            use_container_width=True, 
+                            left_align_df, 
+                            use_container_width=False,  # User request: "reduce the width"
+                            width=500, # Explicit width limit
                             height=400,
                             column_config={
-                                "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
+                                "Epoch": st.column_config.TextColumn("Epoch"), # TextColumn aligns left
                                 "predicted_label": st.column_config.TextColumn(t("pred_stage")),
-                                "predicted_mid": st.column_config.NumberColumn(t("class_index"))
+                                "predicted_mid": st.column_config.TextColumn(t("class_index")) # TextColumn aligns left
                             }
                         )
                         
@@ -1203,25 +1210,27 @@ with tab2:
                                 }
                             )
                             
-                            # --- CONFUSION MATRIX ---
-                            st.divider()
-                            st.markdown("#### Confusion Matrix")
-                            if valid_mask.any():
-                                # Create Confusion Matrix
-                                cm_df = pd.crosstab(
-                                    input_df.loc[valid_mask, 'true_label'], 
-                                    input_df.loc[valid_mask, 'predicted_label'], 
-                                    rownames=['Actual'], 
-                                    colnames=['Predicted']
-                                )
-                                # Ensure all stages are present if possible, or just show what's there
-                                st.dataframe(cm_df.style.background_gradient(cmap='Blues'), use_container_width=True)
-                            else:
-                                st.caption("No valid data for Confusion Matrix.")
+                            # Confusion Matrix removed from here (moved below)
 
                          else:
                              st.markdown("#### Comparison")
                              st.info("No Ground Truth labels found in this file.")
+                    
+                     # --- CONFUSION MATRIX (Moved below tables) ---
+                     if gt_col and input_df[gt_col].notna().any():
+                        valid_mask = input_df[gt_col] >= 0
+                        if valid_mask.any():
+                             st.divider()
+                             st.markdown(f"#### {t('conf_matrix_title') if 'conf_matrix_title' in TRANSLATIONS else 'Confusion Matrix'}")
+                             
+                             cm_df = pd.crosstab(
+                                input_df.loc[valid_mask, 'true_label'], 
+                                input_df.loc[valid_mask, 'predicted_label'], 
+                                rownames=['Actual'], 
+                                colnames=['Predicted']
+                             )
+                             # Center the matrix
+                             st.dataframe(cm_df.style.background_gradient(cmap='Blues'), use_container_width=False)
 
 
                              
