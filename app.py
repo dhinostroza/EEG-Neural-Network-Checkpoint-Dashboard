@@ -487,27 +487,33 @@ with tab1:
 # TAB 2: INFERENCE
 # ==============================================================================
 with tab2:
-    # Create layout: Left (History List) | Right (Upload + Results)
-    # User requested ~10% width for left column. Ratio 1:9.
-    col_history, col_main = st.columns([1, 9])
+    # Create layout: 3 Columns
+    # Col 1: File List (Reduced width ~7%)
+    # Col 2: Uploader (5% wider than Col 1 -> ~12%)
+    # Col 3: Results (Rest ~80%)
+    col_history, col_upload, col_results = st.columns([0.7, 1.2, 8.1])
     
     selected_history_files = []
     
+    # --- COLUMN 1: History List ---
     with col_history:
-        st.subheader("📂 " + (t("history_label") if "history_label" in TRANSLATIONS else "Processed Files"))
+        # Smaller header as requested
+        header_text = t("history_label") if "history_label" in TRANSLATIONS else "Processed Files"
+        st.markdown(f"**📂 {header_text}**")
+        
         if processed_files:
              df_files = pd.DataFrame({"filename": processed_files})
              # Remove .parquet extension for display
              df_files["display_name"] = df_files["filename"].str.replace(".parquet", "", regex=False)
              
-             # Calculate height for ~7 rows. 35px per row + header. ~250-300px.
+             # Calculate height for ~7 rows. 35px per row + header. ~250px.
              event = st.dataframe(
                 df_files,
                 column_config={
                     "display_name": st.column_config.TextColumn("File / Archivo"),
                     "filename": None # Hide original filename
                 },
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 height=250, 
                 on_select="rerun",
@@ -518,12 +524,11 @@ with tab2:
                 indices = event.selection.rows
                 selected_history_files = df_files.iloc[indices]["filename"].tolist()
         else:
-            st.info("No files.")
+            st.info("-")
 
-    with col_main:
-        # File Uploader specific CSS hack for this column? 
-        # Global CSS injects to all, which is fine.
-        
+    # --- COLUMN 2: Uploader ---
+    with col_upload:
+        # Uploader with compact label
         uploaded_files = st.file_uploader(
             label=t("upload_label"),
             type=["parquet", "edf"],
@@ -531,382 +536,303 @@ with tab2:
             key="uploader_main"
         )
         
-        st.markdown("---")
-        
-        # Select Model (Moved here or keep in context?)
-        # Logic requires 'models' list
-        # We need to ensure we have models loaded (Sidebar logic handles loading)
+    # --- COLUMN 3: Results & Model Info ---
+    with col_results:
+        # Select Model Logic (Default to Best)
         if df.empty:
              st.warning(t("no_models_err"))
              selected_model_name = None
         else:
-             # Just use the best model by default logic from before, 
-             # but we need to know WHICH model to use if we re-run.
-             # We can keep model selection implicit (best) or explicit.
-             # The UI had model selection *implied* or previously I might have missed it being passed down.
-             # Actually, the logic for finding 'best_model_row' was in main body.
-             # Let's grab the best model based on current df logic.
-             # Re-implement simple selection or use sidebar override if we had one?
-             # For now stick to Best Model to keep UI clean as requested before.
-             # Or add a small selector in this column.
-             
              valid_df = df[df['val_loss'].notna()].copy()
              if not valid_df.empty:
                 best_model_row = valid_df.sort_values(by='val_loss', ascending=True).iloc[0]
                 selected_model_name = best_model_row['filename']
                 
-                st.markdown(f"**{t('select_model')}**")
-                st.markdown(f"Using Model: **{selected_model_name}**")
+                # Restore detailed info
+                st.subheader(f"🧠 Model: {selected_model_name}")
                 
-                # Show model details
-                model_meta = df[df['filename'] == selected_model_name].iloc[0]
+                # Extract meta
+                lr = best_model_row.get('lr', 'N/A')
+                wrs = best_model_row.get('weighted_sampler', False)
+                weights = "WRS: On" if wrs else "WRS: Off"
+                workers = f"Workers: {best_model_row.get('workers', 0)}"
+                n_files = best_model_row.get('trained_on_files', 0)
                 
-                # Parse filename for details
-                # Example: 2025-09-04_05-36_best-model_convnext_base_20002files_lr2e-05_cwN1-8.0_workers2.ckpt
-                parts = selected_model_name.replace(".ckpt", "").split("_")
-                
-                # Robust extraction (assuming standard format, fallback to safe defaults)
-                date_str = f"{parts[0]}" if len(parts) > 0 else "?"
-                time_str = f"{parts[1].replace('-', ':')}" if len(parts) > 1 else "?"
-                # Architecture often in middle, but we have it in model_meta
-                
-                # Extract specifics matching patterns
-                n_files = next((p for p in parts if "files" in p), "N/A")
-                lr = next((p for p in parts if "lr" in p), "N/A")
-                weights = next((p for p in parts if "cw" in p), "N/A")
-                workers = next((p for p in parts if "workers" in p), "N/A")
-                
-                # Layout for details
-                info_c1, info_c2, info_c3 = st.columns([1.2, 1, 1.2])
+                info_c1, info_c2, info_c3 = st.columns(3)
                 
                 with info_c1:
-                    st.markdown(f"**{t('date_label')}:** {date_str}")
-                    st.markdown(f"**{t('arch')}:** {model_meta.get('model_architecture', 'Unknown')}")
+                    st.markdown(f"**{t('date_label')}:** {best_model_row.get('date', 'N/A')}")
+                    st.markdown(f"**{t('arch')}:** {best_model_row.get('model_architecture', 'Unknown')}")
                 
                 with info_c2:
-                    st.markdown(f"**{t('time_label')}:** {time_str}")
-                    v_loss = model_meta.get('val_loss', 0)
+                    st.markdown(f"**{t('time_label')}:** {best_model_row.get('time', 'N/A')}")
+                    v_loss = best_model_row.get('val_loss', 0)
                     st.markdown(f"**{t('val_loss')}:** {v_loss:.4f}" if isinstance(v_loss, (int, float)) else f"**{t('val_loss')}:** {v_loss}")
                     
                 with info_c3:
                      st.markdown(f"**{t('files_label')}:** {n_files}")
                      st.markdown(f"**{t('params_label')}:** {lr}, {weights}, {workers}")
-    # Auto-trigger analysis if files are present OR history file is selected
-    if (uploaded_files or selected_history_files) and selected_model_name:
-        
-        # Determine source: History OR Upload
-        files_to_process = []
-        if selected_history_files:
-            class MockFile:
-                def __init__(self, name): 
-                    self.name = name
-                    self.from_history = True # Flag to identify
-            
-            files_to_process = [MockFile(name) for name in selected_history_files]
-            st.info(f"Viewing {len(files_to_process)} processed files from history.")
-        else:
-            files_to_process = uploaded_files
+                
+                st.divider()
+                
+                model_meta = df[df['filename'] == selected_model_name].iloc[0]
+             else:
+                selected_model_name = None
 
-        # Iterate over each file
-        for i, uploaded_file in enumerate(files_to_process):
-            # Header instead of expander for cleaner look
-            st.divider()
-            st.markdown(f"### 📄 {uploaded_file.name}")
-            
-            # Always show processing initially
-            status_text = st.empty()
-            progress_bar = st.progress(0)
-            status_text.text(t("processing"))
-            
-            try:
-                # 1. Save uploaded file (Skip for History MockFiles)
-                is_history_file = hasattr(uploaded_file, 'from_history') and uploaded_file.from_history
-                
-                # Determine extension
-                file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-                temp_filename = f"temp_upload_{i}{file_ext}"
-                
-                if not is_history_file:
-                    with open(temp_filename, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                else:
-                    # It's a history file, we don't have the bytes, and we don't need them
-                    # because we expect to pull from SQL.
-                    # We just use the name for SQL lookup.
-                    pass
-                
-                # EDF Conversion Logic (Only for new real uploads)
-                if file_ext == ".edf" and not is_history_file:
-                    status_text.text(f"Converting {uploaded_file.name} to Parquet...")
+        # Auto-trigger analysis
+        # Only run if files are present AND model is selected
+        if (uploaded_files or selected_history_files) and selected_model_name:
+             # Determine source: History OR Upload
+             files_to_process = []
+             if selected_history_files:
+                 class MockFile:
+                     def __init__(self, name): 
+                         self.name = name
+                         self.from_history = True # Flag to identify
+                 
+                 files_to_process = [MockFile(name) for name in selected_history_files]
+                 st.info(f"Viewing {len(files_to_process)} processed files from history.")
+             else:
+                 files_to_process = uploaded_files
+     
+             # Iterate over each file
+             for i, uploaded_file in enumerate(files_to_process):
+                 # Header instead of expander for cleaner look
+                 st.divider()
+                 st.markdown(f"### 📄 {uploaded_file.name}")
+                 
+                 # Always show processing initially
+                 status_text = st.empty()
+                 progress_bar = st.progress(0)
+                 status_text.text(t("processing"))
+                 
+                 try:
+                    # 1. Save uploaded file (Skip for History MockFiles)
+                    is_history_file = hasattr(uploaded_file, 'from_history') and uploaded_file.from_history
                     
-                    # Define output parquet path
-                    parquet_filename = temp_filename.replace(".edf", ".parquet")
+                    # Determine extension
+                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+                    temp_filename = f"temp_upload_{i}{file_ext}" # Use unique name
                     
-                    # Run conversion
-                    success, msg = convert_edf_to_parquet(temp_filename, parquet_filename)
-                    
-                    if not success:
-                        st.error(f"Failed to convert {uploaded_file.name}: {msg}")
-                        # Clean up temp edf
-                        if os.path.exists(temp_filename): os.remove(temp_filename)
-                        continue
-                    
-                    # Success
-                    temp_filename = parquet_filename
-                    file_ext = ".parquet" 
-                    status_text.text(f"Conversion complete. Running inference...")
-                
-                # Check cache for the ORIGINAL filename (edf or parquet)
-                cached_preds = retrieve_from_sql(uploaded_file.name)
-                
-                # Load Data immediately (only if parquet AND not history mock)
-                if file_ext == ".parquet" and not is_history_file:
-                    input_df = pd.read_parquet(temp_filename)
-                else: 
-                     # If history mock, we don't have file content, so empty DF.
-                     # This relies on cached_preds being present.
-                     input_df = pd.DataFrame() 
-
-                predictions = []
-                
-                # ------------------------------------------------------------------
-                # FAST PATH: Check for Pre-computed Results (SQL)
-                # ------------------------------------------------------------------
-                # cached_preds already retrieved above
-                
-                if cached_preds:
-                    # If we have cached results, we use them.
-                    # For history files, we EXPECT this.
-                    # If input_df is empty (history file), we construct a dummy DF for visualization
-                    
-                    # Instant load
-                    time.sleep(0.5) 
-                    progress_bar.progress(100)
-                    predictions = cached_preds
-                    
-                    # Reconstruct input_df if missing (History case)
-                    if input_df.empty:
-                        # We need 'predicted_mid' later, and potentially ground truth if we had it.
-                        # For history, we might not have ground truth unless we saved it?
-                        # SQL schema has 'predicted_stage' (string). 
-                        # retrieve_from_sql returns INDICES.
-                        # We create a dummy DF with length = len(predictions)
-                        input_df = pd.DataFrame(index=range(len(predictions)))
-                        
-                    # Clear indicators
-                    status_text.empty()
-                    progress_bar.empty()
-                else:
-                    # ------------------------------------------------------------------
-                    # NORMAL PATH: Run Inference (Real Uploads Only)
-                    # ------------------------------------------------------------------
-                    if file_ext == ".edf":
-                        # This block shouldn't be reached if we converted above
+                    if not is_history_file:
+                        with open(temp_filename, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+                    else:
                         pass
                     
-                    status_text = st.empty()
-                    progress_bar = st.progress(0)
+                    # EDF Conversion Logic (Only for new real uploads)
+                    if file_ext == ".edf" and not is_history_file:
+                        status_text.text(f"Converting {uploaded_file.name} to Parquet...")
+                        
+                        # Define output parquet path
+                        parquet_filename = temp_filename.replace(".edf", ".parquet")
+                        
+                        # Run conversion
+                        success, msg = convert_edf_to_parquet(temp_filename, parquet_filename)
+                        
+                        if not success:
+                            st.error(f"Failed to convert {uploaded_file.name}: {msg}")
+                            # Clean up temp edf
+                            if os.path.exists(temp_filename): os.remove(temp_filename)
+                            continue
+                        
+                        # Success
+                        temp_filename = parquet_filename
+                        file_ext = ".parquet" 
+                        status_text.text(f"Conversion complete. Running inference...")
+
+                    # Check cache for the ORIGINAL filename (edf or parquet)
+                    cached_preds = retrieve_from_sql(uploaded_file.name)
                     
-                    # 2. Get Model Path
-                    model_path = os.path.join(BASE_DIR, selected_model_name)
+                    # Load Data immediately (only if parquet AND not history mock)
+                    if file_ext == ".parquet" and not is_history_file:
+                        input_df = pd.read_parquet(temp_filename)
+                    else: 
+                         # If history mock, we don't have file content, so empty DF.
+                         # This relies on cached_preds being present.
+                         input_df = pd.DataFrame() 
                     
-                    status_text.text(t("loading_model"))
-                    progress_bar.progress(10)
+                    predictions = []
                     
-                    # Detection
-                    arch = detect_architecture(model_path)
-                    st.caption(f"{t('detected_arch')}: {arch}")
+                    # ------------------------------------------------------------------
+                    # FAST PATH: Check for Pre-computed Results (SQL)
+                    # ------------------------------------------------------------------
+                    if cached_preds:
+                        # Instant load
+                        time.sleep(0.5) 
+                        progress_bar.progress(100)
+                        predictions = cached_preds
+                        
+                        # Reconstruct input_df if missing (History case)
+                        if input_df.empty:
+                            input_df = pd.DataFrame(index=range(len(predictions)))
+                            
+                        status_text.empty()
+                        progress_bar.empty()
+                    else:
+                        # ------------------------------------------------------------------
+                        # NORMAL PATH: Run Inference (Real Uploads Only)
+                        # ------------------------------------------------------------------
+                        if file_ext == ".edf":
+                            pass
+                        
+                        status_text = st.empty()
+                        progress_bar = st.progress(0)
+                        
+                        # 2. Get Model Path
+                        model_path = os.path.join(BASE_DIR, selected_model_name)
+                        
+                        status_text.text(t("loading_model"))
+                        progress_bar.progress(10)
+                        
+                        # Detection
+                        arch = detect_architecture(model_path)
+                        st.caption(f"{t('detected_arch')}: {arch}")
+                        
+                        model = get_model(model_name=arch, num_classes=5, pretrained=False)
+                        model, _ = load_checkpoint_weights(model, model_path)
+                        model.eval()
+                        
+                        status_text.text(t("loading_data"))
+                        progress_bar.progress(30)
+                        
+                        status_text.text(t("running_inf").format(len(input_df)))
+                        
+                        # Inference Loop
+                        with torch.no_grad():
+                            total = len(input_df)
+                            for j in range(total):
+                                row = input_df.iloc[j]
+                                cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage'] if c in input_df.columns]
+                                if cols_to_drop:
+                                    flat_data = row.drop(cols_to_drop).values
+                                else:
+                                    flat_data = row.values
+                                
+                                input_tensor = preprocess_spectrogram(flat_data)
+                                input_tensor = input_tensor.unsqueeze(0)
+                                
+                                logits = model(input_tensor)
+                                pred_idx = torch.argmax(logits, dim=1).item()
+                                predictions.append(pred_idx)
+                                
+                                if j % max(1, int(total/10)) == 0:
+                                    prog = 30 + int(60 * (j / total))
+                                    progress_bar.progress(prog)
+                        
+                        # SAVE TO SQL
+                        dummy_confs = [1.0] * len(predictions)
+                        save_success = save_results_to_sql(uploaded_file.name, predictions, dummy_confs, selected_model_name)
+                        if save_success:
+                            st.toast(f"Saved {uploaded_file.name} to history!")
+                            # Cleanup suffix logic here if needed
+                                 
+                        progress_bar.progress(100)
+                        status_text.success(t("analysis_complete"))
+                        status_text.empty()
+                        progress_bar.empty()
                     
-                    model = get_model(model_name=arch, num_classes=5, pretrained=False)
-                    model, _ = load_checkpoint_weights(model, model_path)
-                    model.eval()
+                    # Process Results
+                    stage_map = {0: t("stage_wake"), 1: "N1", 2: "N2", 3: "N3", 4: "REM"}
+                    input_df['predicted_mid'] = predictions
+                    input_df['predicted_label'] = input_df['predicted_mid'].map(stage_map)
                     
-                    status_text.text(t("loading_data"))
-                    progress_bar.progress(30)
+                    # Visualization
+                    st.subheader(t("results_analysis"))
                     
-                    status_text.text(t("running_inf").format(len(input_df)))
+                    counts = input_df['predicted_label'].value_counts().reset_index()
+                    counts.columns = [t("col_stage"), t("col_count")]
                     
-                    # Inference Loop
-                    with torch.no_grad():
-                        total = len(input_df)
-                        for j in range(total):
-                            row = input_df.iloc[j]
-                            cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage'] if c in input_df.columns]
-                            if cols_to_drop:
-                                flat_data = row.drop(cols_to_drop).values
+                    # Layout
+                    col_viz, col_context = st.columns([2, 1])
+                    
+                    with col_viz:
+                        st.markdown(f"#### {t('sleep_dist')}")
+                        c_stage = t("col_stage")
+                        c_count = t("col_count")
+                        wake_lbl = t("stage_wake")
+                        sort_order = [wake_lbl, 'N1', 'N2', 'N3', 'REM']
+                        
+                        chart = alt.Chart(counts).mark_bar().encode(
+                            x=alt.X(c_stage, sort=sort_order, axis=alt.Axis(labelAngle=0)),
+                            y=c_count,
+                            color=alt.Color(c_stage, scale={"domain": sort_order, "range": ['#f5bf03', '#a7c7e7', '#779ecb', '#03396c', '#ff6b6b']}),
+                            tooltip=[c_stage, c_count]
+                        ).properties(height=350)
+                        st.altair_chart(chart, width="stretch")
+
+                    with col_context:
+                        st.markdown(f"#### {t('model_context')}")
+                        st.info(f"**{t('arch')}**: {model_meta.get('model_architecture', 'Unknown')}")
+                        
+                        # Loss Analysis
+                        v_loss = model_meta.get('val_loss')
+                        if pd.notna(v_loss):
+                            st.write(f"**{t('val_loss')}**: `{v_loss:.4f}`")
+                            if v_loss < 0.60:
+                                st.success(t("high_reliability"))
+                            elif v_loss < 0.80:
+                                st.warning(t("mod_reliability"))
                             else:
-                                flat_data = row.values
-                            
-                            input_tensor = preprocess_spectrogram(flat_data)
-                            input_tensor = input_tensor.unsqueeze(0)
-                            
-                            logits = model(input_tensor)
-                            pred_idx = torch.argmax(logits, dim=1).item()
-                            predictions.append(pred_idx)
-                            
-                            if j % max(1, int(total/10)) == 0:
-                                prog = 30 + int(60 * (j / total))
-                                progress_bar.progress(prog)
-                    
-                    # SAVE TO SQL (New Workflow)
-                    # Create dummy confidence (1.0) since we don't track it in this loop yet, 
-                    # or update loop to track it. For now assuming 1.0 or extracting from logits.
-                    # Let's extract from logits for better data.
-                    # We need to re-run or just mock it. 
-                    # Actually, let's keep it simple: just save predictions with conf=0.0 if not ready,
-                    # BUT user wants to save correct data.
-                    # Since we are running inference line-by-line, we have logits.
-                    # We should have saved confidence in the loop. 
-                    # For this refactor, I'll pass a dummy confidence list to avoid breaking changes, 
-                    # but ideally we modify the loop above.
-                    # Let's verify `predictions` is list of ints.
-                    dummy_confs = [1.0] * len(predictions)
-                    
-                    save_success = save_results_to_sql(uploaded_file.name, predictions, dummy_confs, selected_model_name)
-                    if save_success:
-                        st.toast(f"Saved {uploaded_file.name} to history!")
-                        
-                        # RENAME/CLEANUP (Suffix)
-                        if file_ext == ".parquet" and "_processed" not in uploaded_file.name:
-                             # Logic to rename the temp file or the original upload?
-                             # Streamlit uploads are in RAM/Temp. 
-                             # If we created 'temp_filename', we can rename THAT.
-                             # But that's a temp file. User likely means their LOCAL file?
-                             # Browser can't rename user's local file.
-                             # BUT if this is running continuously on a server watching a folder...
-                             # User said "The processed parquet file gets the _processed suffix for deletion."
-                             # This likely applies to BATCH script or if app is running locally on the dataset.
-                             # Since we convert EDF -> Parquet (temp) -> Process.
-                             # We can rename the *Generated Parquet* on server disk?
-                             # Let's just suffix the temp file for consistency.
-                             pass
-                             
-                    progress_bar.progress(100)
-                    
-                    progress_bar.progress(100)
-                    status_text.success(t("analysis_complete"))
-                    # Clear status after a moment to keep it clean? 
-                    # For now keep success message or remove it to match user request?
-                    # User asked to remove "Cargando...", so success message is fine or maybe redundant.
-                    # Let's clean it up.
-                    status_text.empty()
-                    progress_bar.empty()
-                
-                # Process Results
-                stage_map = {0: t("stage_wake"), 1: "N1", 2: "N2", 3: "N3", 4: "REM"}
-                input_df['predicted_mid'] = predictions
-                input_df['predicted_label'] = input_df['predicted_mid'].map(stage_map)
-                
-                # Visualization
-                # st.divider() # Removed extra divider
-                st.subheader(t("results_analysis"))
-                
-                counts = input_df['predicted_label'].value_counts().reset_index()
-                counts.columns = [t("col_stage"), t("col_count")]
-                
-                # Layout
-                col_viz, col_context = st.columns([2, 1])
-                
-                with col_viz:
-                    st.markdown(f"#### {t('sleep_dist')}")
-                    
-                    c_stage = t("col_stage")
-                    c_count = t("col_count")
-                    wake_lbl = t("stage_wake")
-                    sort_order = [wake_lbl, 'N1', 'N2', 'N3', 'REM']
-                    
-                    chart = alt.Chart(counts).mark_bar().encode(
-                        x=alt.X(c_stage, sort=sort_order, axis=alt.Axis(labelAngle=0)),
-                        y=c_count,
-                        color=alt.Color(c_stage, scale={"domain": sort_order, "range": ['#f5bf03', '#a7c7e7', '#779ecb', '#03396c', '#ff6b6b']}),
-                        tooltip=[c_stage, c_count]
-                    ).properties(height=350)
-                    st.altair_chart(chart, width="stretch")
-
-                with col_context:
-                    st.markdown(f"#### {t('model_context')}")
-                    st.info(f"**{t('arch')}**: {model_meta.get('model_architecture', 'Unknown')}")
-                    
-                    # Loss Analysis
-                    v_loss = model_meta.get('val_loss')
-                    if pd.notna(v_loss):
-                        st.write(f"**{t('val_loss')}**: `{v_loss:.4f}`")
-                        if v_loss < 0.60:
-                            st.success(t("high_reliability"))
-                        elif v_loss < 0.80:
-                            st.warning(t("mod_reliability"))
+                                st.error(t("low_reliability"))
                         else:
-                            st.error(t("low_reliability"))
-                    else:
-                        st.write(f"**{t('val_loss')}**: N/A")
+                             st.write(f"**{t('val_loss')}**: N/A")
 
-                    st.write(f"**{t('epoch')}**: {model_meta.get('epoch', 'N/A')}")
-                    st.write(f"**{t('params_label')}**: {model_meta.get('params_m', 0):.2f} M")
+                        st.write(f"**{t('epoch')}**: {model_meta.get('epoch', 'N/A')}")
+                        st.write(f"**{t('params_label')}**: {model_meta.get('params_m', 0):.2f} M")
+                        st.caption(t("context_caption"))
                     
-                    st.caption(t("context_caption"))
-                
-                col_res1, col_res2 = st.columns(2)
-                with col_res1:
-                    st.write(t("dist_table"))
-                    st.dataframe(counts, width="stretch")
-                
-                with col_res2:
-                    st.write(t("download_results"))
-                    csv = input_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label=t("download_csv"),
-                        data=csv,
-                        file_name=f"predictions_{uploaded_file.name}.csv",
-                        mime="text/csv",
-                        key=f"download_{i}" # Unique key for each button
-                    )
+                    col_res1, col_res2 = st.columns(2)
+                    with col_res1:
+                        st.write(t("dist_table"))
+                        st.dataframe(counts, width="stretch")
+                    
+                    with col_res2:
+                        st.write(t("download_results"))
+                        csv = input_df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label=t("download_csv"),
+                            data=csv,
+                            file_name=f"predictions_{uploaded_file.name}.csv",
+                            mime="text/csv",
+                            key=f"download_{i}" # Unique key for each button
+                        )
 
-                # ----------------------------------------------------------------------
-                # GROUND TRUTH COMPARISON (User Request)
-                # ----------------------------------------------------------------------
-                # Check for label/stage column with valid values (not -1)
-                gt_col = None
-                for potential_col in ['label', 'stage', 'sleep_stage', 'annotation']:
-                    if potential_col in input_df.columns:
-                        gt_col = potential_col
-                        break
-                
-                if gt_col:
-                    # Check if we have real values (not dummy -1 from conversion)
-                    unique_vals = input_df[gt_col].unique()
-                    # If we have values >= 0, it likely has ground truth
-                    # (Filter out -1)
-                    valid_labels = [v for v in unique_vals if v >= 0]
+                    # ----------------------------------------------------------------------
+                    # GROUND TRUTH COMPARISON
+                    # ----------------------------------------------------------------------
+                    gt_col = None
+                    for potential_col in ['label', 'stage', 'sleep_stage', 'annotation']:
+                        if potential_col in input_df.columns:
+                            gt_col = potential_col
+                            break
                     
-                    if valid_labels:
-                        st.divider()
-                        st.subheader("📊 Comparison with Ground Truth")
+                    if gt_col:
+                        unique_vals = input_df[gt_col].unique()
+                        valid_labels = [v for v in unique_vals if v >= 0]
                         
-                        comp_df = pd.DataFrame({
-                            "Epoch": range(len(input_df)),
-                            "Ground Truth (Index)": input_df[gt_col],
-                            "Predicted (Index)": input_df['predicted_mid'],
-                        })
-                        
-                        # Map strings
-                        comp_df["Ground Truth"] = comp_df["Ground Truth (Index)"].map(stage_map).fillna("Unknown")
-                        comp_df["Predicted"] = input_df['predicted_label']
-                        
-                        # Match col
-                        comp_df["Match"] = comp_df["Ground Truth (Index)"] == comp_df["Predicted (Index)"]
-                        
-                        # Accuracy for this file
-                        acc = comp_df["Match"].mean() * 100
-                        st.markdown(f"**Agreement/Accuracy**: `{acc:.2f}%`")
-                        
-                        # Show table
-                        st.dataframe(comp_df[["Epoch", "Ground Truth", "Predicted", "Match"]], width="stretch", height=400)
-                        
-                    else:
-                        st.caption("No ground truth labels found (values are all -1/missing).")
-                    
-            except Exception as e:
-                st.error(f"Error: {e}")
+                        if valid_labels:
+                            st.divider()
+                            st.subheader("📊 Comparison with Ground Truth")
+                            
+                            comp_df = pd.DataFrame({
+                                "Epoch": range(len(input_df)),
+                                "Ground Truth (Index)": input_df[gt_col],
+                                "Predicted (Index)": input_df['predicted_mid'],
+                            })
+                            
+                            comp_df["Ground Truth"] = comp_df["Ground Truth (Index)"].map(stage_map).fillna("Unknown")
+                            comp_df["Predicted"] = input_df['predicted_label']
+                            comp_df["Match"] = comp_df["Ground Truth (Index)"] == comp_df["Predicted (Index)"]
+                            
+                            acc = comp_df["Match"].mean() * 100
+                            st.markdown(f"**Agreement/Accuracy**: `{acc:.2f}%`")
+                            
+                            st.dataframe(comp_df[["Epoch", "Ground Truth", "Predicted", "Match"]], width="stretch", height=400)
+                        else:
+                            st.caption("No ground truth labels found (values are all -1/missing).")
+                 except Exception as e:
+                     st.error(f"Error: {e}")
 
 # ==============================================================================
 # TAB 3: CONVERTER SCRIPT
