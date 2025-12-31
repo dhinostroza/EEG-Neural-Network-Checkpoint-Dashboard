@@ -244,27 +244,33 @@ def inject_custom_css():
             font-size: 0.8em;
         }
         
+        /* Force Uploader Height */
         section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
-            min-height: 150px; /* Increase height by ~40px */
+            min-height: 150px !important;
+            padding: 30px !important; /* Add padding to prevent cramping */
             display: flex;
+            flex-direction: column; /* Stack explicit elements */
             align-items: center; 
             justify-content: center;
         }
 
-        /* Drag and Drop Text */
-        section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] div div span {
-             display: none;
+        /* Hide DEFAULT Streamlit text (Drag & drop, Limit...) which are usually inside small/span */
+        section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] small,
+        section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] span {
+             display: none !important;
         }
-        section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] div div::before {
-            content: "Arrastre y suelte archivos aquí";
+        
+        /* Inject CUSTOM text */
+        /* We use ::after on the main dropzone container to append our text */
+        section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"]::after {
+            content: "Arrastre y suelte archivos aquí \\A Límite 200MB por archivo • PARQUET, EDF, XML";
+            white-space: pre-wrap; /* Allows line break \A and wrapping */
+            text-align: center;
             font-size: 1rem;
+            color: inherit;
+            margin-top: 10px;
             display: block;
-            margin-bottom: 5px;
         }
-
-         /* Browse Button (This is harder to target perfectly without hiding interaction, be careful) */
-         /* Usually better to leave 'Browse files' or accept it, but let's try to override if feasible. */
-         /* The button is inside generated shadow DOM or complex sturcture sometimes. Skipping button to avoid breakage. */
          
          /* Force scrollbars to be visible (Mac auto-hide override) */
          /* Webkit browsers (Chrome, Safari) */
@@ -309,6 +315,14 @@ with st.sidebar:
 def t(key):
     return TRANSLATIONS.get(key, {}).get(LANG, key)
 
+# --- Globals for Local SHHS Paths ---
+SHHS_XML_DIRS = [
+    "/Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/03_nssr_shhs/parquet_files/annotations-events-nsrr/shhs1/",
+    "/Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/03_nssr_shhs/parquet_files/annotations-events-profusion/shhs1/",
+    "/Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/03_nssr_shhs/parquet_files/annotations-events-nsrr/shhs2/",
+    "/Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/03_nssr_shhs/parquet_files/annotations-events-profusion/shhs2/"
+]
+
 def extract_gt_from_xml(xml_path):
     """
     Parses Sleep-EDF (Hypnogram) or NSRR (Profusion) XMLs.
@@ -330,7 +344,32 @@ def extract_gt_from_xml(xml_path):
             'R': 4, 'REM': 4, '5': 4
         }
         
-        # 1. Sleep-EDF <SleepStage>
+        # 1. Sleep-EDF <SleepStage> with <Duration>
+        # (Already handled in previous logic, but check if we have pure <SleepStages> list first or mixed)
+        
+        # 2. Profusion Epoch List <SleepStages><SleepStage>0</SleepStage>...
+        # This is a flat list of epochs (usually 30s)
+        sleep_stages_container = root.find("SleepStages")
+        if sleep_stages_container is not None:
+             # Just iterate children
+             for stage_elem in sleep_stages_container.findall("SleepStage"):
+                 val = stage_elem.text
+                 if val in stage_map_str:
+                     labels.append(stage_map_str[val])
+                 else:
+                     # Fallback or strict? 
+                     # Usually just map simple ints
+                     try:
+                         v_int = int(val)
+                         # Simple map: 0=W,1=1,2=2,3=3,4=3,5=R
+                         if v_int == 5: labels.append(4)
+                         elif v_int == 4: labels.append(3)
+                         else: labels.append(v_int)
+                     except:
+                         labels.append(-1)
+             return labels
+
+        # 3. Sleep-EDF Format (SleepStage + Duration siblings)
         sleep_stages = root.findall(".//SleepStage")
         durations = root.findall(".//Duration")
         
@@ -343,12 +382,17 @@ def extract_gt_from_xml(xml_path):
                 labels.extend([label] * n_epochs)
             return labels
 
-        # 2. NSRR / Profusion <ScoredEvent>
+        # 4. NSRR / Profusion <ScoredEvent>
         scored_events = root.findall(".//ScoredEvent")
         if scored_events:
             for event in scored_events:
-                concept = event.find("EventConcept").text
-                duration = float(event.find("Duration").text)
+                concept_node = event.find("EventConcept")
+                if concept_node is None: continue
+                concept = concept_node.text
+                
+                dur_node = event.find("Duration")
+                if dur_node is None: continue
+                duration = float(dur_node.text)
                 
                 if "Sleep stage" in concept:
                     label = -1
@@ -368,6 +412,13 @@ def extract_gt_from_xml(xml_path):
     except Exception as e:
         print(f"XML Parsing Error: {e}")
         return []
+
+# --- Logic in loop ---
+# We need to find where the loop is processing files and inject the lookup.
+# Since I cant see the loop line numbers in this small context window, 
+# I will use replace_file_content on the function definition first, 
+# then another call to modify the loop. This tool call is just defining the function and globals.
+
 
 # --- Helpers ---
 def retrieve_from_sql(filename):
@@ -842,32 +893,6 @@ with tab2:
                         # Extract core ID from data filename (e.g. SC4012)
                         # Sleep-EDF: SC4012E0-PSG.edf -> SC4012
                         base_id = uploaded_file.name[:6] # First 6 chars is a good heuristic for Sleep-EDF/SHHS
-                        
-                        matched_xml = None
-                        for xml_name, xml_uf in xml_files_map.items():
-                            if base_id in xml_name:
-                                matched_xml = xml_uf
-                                break
-                        
-                        if matched_xml:
-                            st.toast(f"Found Ground Truth: {matched_xml.name}", icon="✅")
-                            # Save XML temporarily to parse
-                            temp_xml_path = f"temp_{i}.xml"
-                            with open(temp_xml_path, "wb") as f:
-                                f.write(matched_xml.getbuffer())
-                            
-                            gt_labels = extract_gt_from_xml(temp_xml_path)
-                            
-                            # Clean up
-                            if os.path.exists(temp_xml_path): os.remove(temp_xml_path)
-                            
-                            if gt_labels:
-                                # Ensure validation: lengths might differ slightly due to cuts
-                                # We'll crop or pad matching the input_df (if exists) or prediction len later
-                                # For now, store in a temporary way or inject if input_df has index
-                                # If input_df is loaded (Parquet), we can try to add it now
-                                if not input_df.empty:
-                                    # Truncate to min length
                                     min_len = min(len(input_df), len(gt_labels))
                                     input_df['label'] = pd.Series(gt_labels[:min_len])
                                     # Also ensure 'stage' or 'sleep_stage' is set for compatibility
