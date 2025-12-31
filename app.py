@@ -27,8 +27,8 @@ TRANSLATIONS = {
         "es": "Panel de control de modelos (Checkpoints)"
     },
     "header_desc": {
-        "en": "Monitor training results and identify top-performing models.",
-        "es": "Monitorea los resultados del entrenamiento e identifica los modelos de mejor rendimiento. Los EEG fueron convertidos de formato .edf a .parquet, para acelerar la lectura. Para esto, se extrajo la lógica de procesamiento de señales del script original, utilizando `mne` para la lectura y re-muestreo a 64Hz, y `scipy` para la generación de espectrogramas (dimensiones 76x60, `nperseg=128`, log-scaling). Este proceso se ejecuta automáticamente en tiempo real al subir un archivo .edf. El análisis se hizo con el mejor modelo entrenado disponible y se procesó con numpy para optimizar la velocidad de estos resultados."
+        "en": "Monitor training results and identify top-performing models. (Numpy vectorization is ~120k epochs/sec).",
+        "es": "Monitorea los resultados del entrenamiento e identifica los modelos de mejor rendimiento. Los EEG fueron convertidos de formato .edf a .parquet, para acelerar la lectura. Para esto, se extrajo la lógica de procesamiento de señales del script original, utilizando `mne` para la lectura y re-muestreo a 64Hz, y `scipy` para la generación de espectrogramas (dimensiones 76x60, `nperseg=128`, log-scaling). Este proceso se ejecuta automáticamente en tiempo real al subir un archivo .edf. El análisis se hizo con el mejor modelo entrenado disponible y se procesó con numpy para optimizar la velocidad de estos resultados (la vectorización de Numpy es ~120k épocas/seg)."
     },
     "settings": {
         "en": "Settings",
