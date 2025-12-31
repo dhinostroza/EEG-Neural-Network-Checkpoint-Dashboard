@@ -724,7 +724,7 @@ with tab2:
                  # "Select All" option could be added here if needed, but keeping it simple first
                  for f in processed_files:
                      # Display name without extension for cleaner look
-                     display_name = f.replace(".parquet", "")
+                     display_name = f.replace(".parquet", "").replace("_processed", "")
                      # Unique key for each checkbox
                      if st.checkbox(display_name, key=f"hist_{f}"):
                          selected_history_files.append(f)
