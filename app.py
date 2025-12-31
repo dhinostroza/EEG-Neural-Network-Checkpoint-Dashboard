@@ -259,18 +259,26 @@ def inject_custom_css():
          /* The button is inside generated shadow DOM or complex sturcture sometimes. Skipping button to avoid breakage. */
          
          /* Force scrollbars to be visible (Mac auto-hide override) */
+         /* Webkit browsers (Chrome, Safari) */
          ::-webkit-scrollbar {
             -webkit-appearance: none;
-            width: 7px;
-            height: 7px;
+            width: 8px !important;
+            height: 8px !important;
+            display: block !important;
          }
          ::-webkit-scrollbar-thumb {
             border-radius: 4px;
-            background-color: rgba(0, 0, 0, 0.5); /* Visible grey */
+            background-color: rgba(100, 100, 100, 0.5) !important; /* Visible grey */
             box-shadow: 0 0 1px rgba(255, 255, 255, .5);
          }
          ::-webkit-scrollbar-track {
              background-color: transparent;
+         }
+         
+         /* Firefox */
+         * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(100, 100, 100, 0.5) transparent;
          }
         </style>
     """, unsafe_allow_html=True)
@@ -519,10 +527,10 @@ with tab1:
 # ==============================================================================
 with tab2:
     # Create layout: 3 Columns
-    # Col 1: File List (Reduced width ~7%)
-    # Col 2: Uploader (Increased to ~17%)
-    # Col 3: Results (Rest ~76%)
-    col_history, col_upload, col_results = st.columns([0.7, 1.7, 7.6])
+    # Col 1: File List (Increased to ~9% to fit header)
+    # Col 2: Uploader (~17%)
+    # Col 3: Results (Rest ~74%)
+    col_history, col_upload, col_results = st.columns([0.9, 1.7, 7.4])
     
     selected_history_files = []
     
@@ -540,7 +548,7 @@ with tab2:
              event = st.dataframe(
                 df_files,
                 column_config={
-                    "display_name": st.column_config.TextColumn("File / Archivo"),
+                    "display_name": st.column_config.TextColumn(t("files_label")),
                     "filename": None # Hide original filename
                 },
                 width="stretch",
