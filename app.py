@@ -709,9 +709,17 @@ with tab2:
                          st.markdown(f"**{t('files_label')}:** {n_files}")
                          st.markdown(f"**{t('params_label')}:** {lr}, {weights}, {workers}")
                     
-                    st.divider()
+                     st.divider()
                  else:
                     selected_model_name = None
+
+        # --- GAP (User Request: ~20px) ---
+        st.write("") 
+        st.write("") 
+        
+        # --- GLOBAL STATUS AREA ---
+        # User wants to see progress "here" (below uploader)
+        global_status_container = st.empty()
 
         # --- RESULTS AREA (Full Main Column Width) ---
         # Auto-trigger analysis
@@ -737,10 +745,13 @@ with tab2:
                  st.divider()
                  st.markdown(f"### 📄 {uploaded_file.name}")
                  
-                 # Always show processing initially
+                     # Always show processing initially
+                 # Use GLOBAL container for high-level status as requested
+                 global_status_container.info(f"Processing {i+1}/{len(files_to_process)}: {uploaded_file.name}")
+                 
+                 # Keep local status for card context if needed, but rely on global for "red arrow" area
                  status_text = st.empty()
                  progress_bar = st.progress(0)
-                 status_text.text(t("processing"))
                  
                  try:
                     # 1. Save uploaded file (Skip for History MockFiles)
@@ -758,7 +769,7 @@ with tab2:
                     
                     # EDF Conversion Logic (Only for new real uploads)
                     if file_ext == ".edf" and not is_history_file:
-                        status_text.text(f"Converting {uploaded_file.name} to Parquet...")
+                        global_status_container.info(f"Converting {uploaded_file.name} to Parquet...")
                         
                         # Define output parquet path
                         parquet_filename = temp_filename.replace(".edf", ".parquet")
@@ -775,7 +786,7 @@ with tab2:
                         # Success
                         temp_filename = parquet_filename
                         file_ext = ".parquet" 
-                        status_text.text(f"Conversion complete. Running inference...")
+                        global_status_container.success(f"Conversion complete for {uploaded_file.name}. Running inference...")
 
                     # Check cache for the ORIGINAL filename (edf or parquet)
                     cached_preds = retrieve_from_sql(uploaded_file.name)
@@ -843,7 +854,7 @@ with tab2:
                         if input_df.empty:
                             input_df = pd.DataFrame(index=range(len(predictions)))
                             
-                        status_text.empty()
+                        global_status_container.success(f"Loaded cached results for {uploaded_file.name}")
                         progress_bar.empty()
                     else:
                         # ------------------------------------------------------------------
@@ -852,13 +863,13 @@ with tab2:
                         if file_ext == ".edf":
                             pass
                         
-                        status_text = st.empty()
+                        status_text = st.empty() # Reset local text
                         progress_bar = st.progress(0)
                         
                         # 2. Get Model Path
                         model_path = os.path.join(BASE_DIR, selected_model_name)
                         
-                        status_text.text(t("loading_model"))
+                        global_status_container.info(t("loading_model"))
                         progress_bar.progress(10)
                         
                         # Detection
@@ -869,17 +880,17 @@ with tab2:
                         model, _ = load_checkpoint_weights(model, model_path)
                         model.eval()
                         
-                        status_text.text(t("loading_data"))
+                        global_status_container.info(f"{t('loading_data')} ({uploaded_file.name})")
                         progress_bar.progress(30)
                         
-                        status_text.text(t("running_inf").format(len(input_df)))
+                        global_status_container.info(t("running_inf").format(len(input_df)))
                         
                         # Inference Loop
                         with torch.no_grad():
                             total = len(input_df)
                             for j in range(total):
                                 row = input_df.iloc[j]
-                                cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage'] if c in input_df.columns]
+                                cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage', 'true_label'] if c in input_df.columns]
                                 if cols_to_drop:
                                     flat_data = row.drop(cols_to_drop).values
                                 else:
@@ -904,8 +915,7 @@ with tab2:
                             # Cleanup suffix logic here if needed
                                  
                         progress_bar.progress(100)
-                        status_text.success(t("analysis_complete"))
-                        status_text.empty()
+                        global_status_container.success(f"{t('analysis_complete')}: {uploaded_file.name}")
                         progress_bar.empty()
                     
                     # Process Results
