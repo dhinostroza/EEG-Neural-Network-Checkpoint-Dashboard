@@ -807,10 +807,9 @@ with tab2:
                     workers = f"Workers: {selected_model_row.get('workers', 0)}"
                     n_files = selected_model_row.get('trained_on_files', 0)
                     
-                    info_c1, info_c2, info_c3 = st.columns(3)
+                    info_c1, info_c2, info_c3, info_c4 = st.columns(4)
                     
                     with info_c1:
-                        # Merged into one markdown for tighter spacing
                         st.markdown(f"**{t('date_label')}:** {selected_model_row.get('date', 'N/A')}  \n"
                                     f"**{t('arch')}:** {selected_model_row.get('model_architecture', 'Unknown')}")
                     
@@ -821,33 +820,21 @@ with tab2:
                                     f"**{t('val_loss')}:** {v_loss_str}")
                         
                     with info_c3:
-                         # Param string construction: 'lr = 2e-05, cwN1-8.0 Workers = 2'
-                         # Parse parts from filename or use metadata
-                         # Filename ex: ..._lr2e-05_cwN1-8.0_workers2.ckpt
+                         st.markdown(f"**{t('files_label')}:** {n_files}  \n"
+                                     f"**{t('epoch')}:** {selected_model_row.get('epoch', 'N/A')}")
+                                     
+                    with info_c4:
+                         # Param string construction
                          fname = selected_model_row.get('filename', '')
-                         
                          import re
-                         # Extract cw part
                          cw_match = re.search(r'(cwN1-[\d\.]+)', fname)
                          cw_str = cw_match.group(1) if cw_match else (weights if weights else "")
-                         
-                         # Cleanup LR display: 2e-05 (which is correct in `lr` variable usually)
-                         # If lr is just a number, format it.
                          lr_val = selected_model_row.get('lr', 'N/A')
-                         
-                         # Workers
                          w_val = selected_model_row.get('workers', 0)
-                         
-                         # Construct final string
-                         # Note: The user requested comma after LR but NO comma after cw? 
-                         # 'lr = 2e-05, cwN1-8.0 Workers = 2'
-                         # Wait, in the image provided or text? 
-                         # Text: 'lr = 2e-05, cwN1-8.0 Workers = 2'
-                         
                          params_str = f"lr = {lr_val}, {cw_str} Workers = {w_val}"
                          
-                         st.markdown(f"**{t('files_label')}:** {n_files}  \n"
-                                     f"**{t('params_label')}:** {params_str}")
+                         st.markdown(f"**{t('params_label')}:** {selected_model_row.get('params_m', 0):.2f} M  \n"
+                                     f"**Hyperparams:** {params_str}")
                     
                     st.divider()
                  else:
