@@ -539,27 +539,20 @@ with tab2:
         st.markdown(f"**{t('history_label')}**")
         
         if processed_files:
-             df_files = pd.DataFrame({"filename": processed_files})
-             # Remove .parquet extension for display
-             df_files["display_name"] = df_files["filename"].str.replace(".parquet", "", regex=False)
+             # Container with fixed height for scrolling (Sidebar behavior)
+             # Using st.checkbox ensures clicking the name toggles selection
+             with st.container(height=700, border=True):
+                 # "Select All" option could be added here if needed, but keeping it simple first
+                 for f in processed_files:
+                     # Display name without extension for cleaner look
+                     display_name = f.replace(".parquet", "")
+                     # Unique key for each checkbox
+                     if st.checkbox(display_name, key=f"hist_{f}"):
+                         selected_history_files.append(f)
              
-             # Increased height to act as a sidebar (700px)
-             event = st.dataframe(
-                df_files,
-                column_config={
-                    "display_name": st.column_config.TextColumn(t("files_label")),
-                    "filename": None # Hide original filename
-                },
-                width="stretch",
-                hide_index=True,
-                height=700, 
-                on_select="rerun",
-                selection_mode="multi-row",
-                key="history_list_main" # Unique key
-            )
-             if event.selection.rows:
-                indices = event.selection.rows
-                selected_history_files = df_files.iloc[indices]["filename"].tolist()
+             # Show count
+             if selected_history_files:
+                 st.caption(f"{len(selected_history_files)} selected")
         else:
             st.info("-")
 
