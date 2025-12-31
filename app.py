@@ -596,7 +596,8 @@ with tab2:
     # Create layout: 2 Main Columns
     # Col 1: Sidebar-like File List (Full height)
     # Col 2: Main Content (Uploader/Model on top, Results below)
-    col_left_sidebar, col_main_content = st.columns([1.0, 9.0])
+    # Adjusted ratios for better spacing (Ref: User Image)
+    col_left_sidebar, col_main_content = st.columns([1.5, 8.5])
     
     selected_history_files = []
     
@@ -626,7 +627,8 @@ with tab2:
     # --- COLUMN 2: MAIN CONTENT ---
     with col_main_content:
         # Top Row: Uploader and Model Selector
-        col_top_upload, col_top_model = st.columns([1.8, 7.2])
+        # Adjusted inner ratios: Uploader needs more horizontal space
+        col_top_upload, col_top_model = st.columns([2.5, 7.5])
         
         # --- Top Left: Uploader ---
         with col_top_upload:
