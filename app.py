@@ -89,8 +89,8 @@ TRANSLATIONS = {
         "es": "Procesando..."
     },
     "upload_label": {
-        "en": "Upload EEG Spectrograms (.parquet, .edf)",
-        "es": "Cargar espectrogramas EEG (.parquet, .edf)"
+        "en": "Upload EEG Spectrograms (.parquet, .edf, .xml)",
+        "es": "Cargar espectrogramas EEG (.parquet, .edf, .xml)"
     },
     "select_model": {
         "en": "Select a model. The best one is selected by default.",
