@@ -138,7 +138,7 @@ TRANSLATIONS = {
     },
     "select_model_label": {
         "en": "Select Model",
-        "es": "Seleccionar modelo"
+        "es": "Seleccionar el modelo"
     },
     "params_label": {
         "en": "Params",
