@@ -545,28 +545,45 @@ with tab2:
         else:
              valid_df = df[df['val_loss'].notna()].copy()
              if not valid_df.empty:
-                best_model_row = valid_df.sort_values(by='val_loss', ascending=True).iloc[0]
-                selected_model_name = best_model_row['filename']
+                # Identify best model for default
+                best_model_idx = valid_df['val_loss'].idxmin()
+                best_model_name = valid_df.loc[best_model_idx, 'filename']
+                
+                # Model Selector
+                model_options = valid_df['filename'].tolist()
+                # Find index of best model in the list
+                default_index = model_options.index(best_model_name) if best_model_name in model_options else 0
+                
+                selected_model_name = st.selectbox(
+                    t("select_model_label") if "select_model_label" in TRANSLATIONS else "Select Model / Seleccionar Modelo",
+                    options=model_options,
+                    index=default_index,
+                    key="model_selector"
+                )
+                
+                # Get the row for the SELECTED model
+                selected_model_row = df[df['filename'] == selected_model_name].iloc[0]
+                model_meta = selected_model_row # Update global meta reference
                 
                 # Restore detailed info
                 st.subheader(f"🧠 Model: {selected_model_name}")
                 
                 # Extract meta
-                lr = best_model_row.get('lr', 'N/A')
-                wrs = best_model_row.get('weighted_sampler', False)
+                lr = selected_model_row.get('lr', 'N/A')
+                wrs = selected_model_row.get('weighted_sampler', False)
                 weights = "WRS: On" if wrs else "WRS: Off"
-                workers = f"Workers: {best_model_row.get('workers', 0)}"
-                n_files = best_model_row.get('trained_on_files', 0)
+                workers = f"Workers: {selected_model_row.get('workers', 0)}"
+                n_files = selected_model_row.get('trained_on_files', 0)
                 
                 info_c1, info_c2, info_c3 = st.columns(3)
                 
                 with info_c1:
-                    st.markdown(f"**{t('date_label')}:** {best_model_row.get('date', 'N/A')}")
-                    st.markdown(f"**{t('arch')}:** {best_model_row.get('model_architecture', 'Unknown')}")
+                    st.markdown(f"**{t('date_label')}:** {selected_model_row.get('date', 'N/A')}")
+                    st.markdown(f"**{t('arch')}:** {selected_model_row.get('model_architecture', 'Unknown')}")
                 
                 with info_c2:
-                    st.markdown(f"**{t('time_label')}:** {best_model_row.get('time', 'N/A')}")
-                    v_loss = best_model_row.get('val_loss', 0)
+                    st.markdown(f"**{t('time_label')}:** {selected_model_row.get('time', 'N/A')}")
+                    v_loss = selected_model_row.get('val_loss', 0)
                     st.markdown(f"**{t('val_loss')}:** {v_loss:.4f}" if isinstance(v_loss, (int, float)) else f"**{t('val_loss')}:** {v_loss}")
                     
                 with info_c3:
@@ -574,8 +591,6 @@ with tab2:
                      st.markdown(f"**{t('params_label')}:** {lr}, {weights}, {workers}")
                 
                 st.divider()
-                
-                model_meta = df[df['filename'] == selected_model_name].iloc[0]
              else:
                 selected_model_name = None
 
