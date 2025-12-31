@@ -458,68 +458,69 @@ def retrieve_from_sql(filename):
     if not os.path.exists(sql_path):
         return None
         
+def retrieve_from_sql(filename):
+    """Retrieves predictions from SQL if they exist."""
+    sql_path = "predictions.sql"
+    if not os.path.exists(sql_path):
+        return None
+        
     predictions = []
     
-    # We look for the start marker
-    start_marker = f"-- Data for {filename}"
-    parsing = False
+    # Check original name OR processed name
+    # If filename is "SC4001E.parquet", check that AND "SC4001E_processed.parquet"
+    target_filenames = [filename]
+    name, ext = os.path.splitext(filename)
+    if not name.endswith("_processed"):
+         target_filenames.append(f"{name}_processed{ext}")
     
-    # Simple file scan
-    # For large files, grep is faster, but Python file reading is buffered and decent for <500MB
-    # For 11k files, this file will be large, so we would ideally use a database.
-    # For this demo, we can use a quick search or grep.
     try:
-        # Optimization: Use grep to get the block line numbers or content if possible?
-        # Or just read line by line. Let's try read line by line, if it's too slow we optimize.
-        # Actually, let's use linux grep if available for speed.
-        import subprocess
-        
-        # Grep extracting only lines matching the filename in the INSERT values
-        # Format: ('SC4051', 'SC4051E.parquet', ...
-        # We can just grep for the filename inside the file. 
-        # But we need parsing.
-        
-        # Safer: Find the block start
         with open(sql_path, 'r', encoding='utf-8', errors='ignore') as f:
-            for line in f:
-                if start_marker in line:
-                    parsing = True
-                    continue
+            lines = f.readlines()
+            
+            # Simple scan for matching blocks
+            for target in target_filenames:
+                start_marker = f"-- Data for {target}"
+                matching_preds = []
+                parsing = False
                 
-                if parsing:
-                    if line.startswith("-- Data for"): # Next block
-                        break
+                for line in lines:
+                    if start_marker in line:
+                        parsing = True
+                        continue
                     
-                    if "INSERT INTO" in line or "CREATE TABLE" in line:
-                        continue
+                    if parsing:
+                        if line.startswith("-- Data for"): 
+                            # Hit another block
+                            parsing = False
+                            continue
                         
-                    # Parse values
-                    # Line format: ('Client', 'File', 0, 'Stage', 0.99, 'Model'),
-                    # We want the stage (index 3).
-                    # 'Wake', 'N1', 'N2', 'N3', 'REM'
-                    try:
-                        # Extract the stage string
-                        # split by comma, careful with quotes
-                        parts = line.split(',')
-                        if len(parts) >= 6:
-                            stage_str = parts[3].strip().replace("'", "")
+                        if "INSERT INTO" in line or "CREATE TABLE" in line:
+                            continue
                             
-                            # Map back to int for compatibility with app logic
-                            stage_map_rev = {"Wake": 0, "N1": 1, "N2": 2, "N3": 3, "REM": 4}
-                            if stage_str in stage_map_rev:
-                                predictions.append(stage_map_rev[stage_str])
-                    except:
-                        continue
-                        
+                        # Parse values: ('Patient', 'Filename', Index, 'Stage', ...)
+                        try:
+                            if f"'{target}'" in line:
+                                parts = line.split(',')
+                                if len(parts) >= 6:
+                                    stage_str = parts[3].strip().replace("'", "")
+                                    # Map back
+                                    stage_map_rev = {"Wake": 0, "N1": 1, "N2": 2, "N3": 3, "REM": 4}
+                                    idx = int(parts[2])
+                                    if stage_str in stage_map_rev:
+                                        matching_preds.append((idx, stage_map_rev[stage_str]))
+                        except:
+                            continue
+                
+                if matching_preds:
+                    # Sort and return
+                    matching_preds.sort(key=lambda x: x[0])
+                    return [p[1] for p in matching_preds]
+                    
     except Exception as e:
         print(f"Error reading SQL: {e}")
         return None
         
-    except Exception as e:
-        print(f"Error reading SQL: {e}")
-        return None
-        
-    return predictions if predictions else None
+    return None
 
 def get_processed_files_list():
     """Reads processed_files.log to get list of files."""
@@ -860,20 +861,19 @@ with tab2:
                  st.divider()
                  st.markdown(f"### 📄 {uploaded_file.name}")
                  
-                     # Always show processing initially
+                 # Always show processing initially
                  # Use GLOBAL container for high-level status as requested
                  global_status_container.info(f"Processing {i+1}/{len(files_to_process)}: {uploaded_file.name}")
                  
                  # Keep local status for card context if needed, but rely on global for "red arrow" area
                  status_text = st.empty()
                  progress_bar = st.progress(0)
-                 
+                
+                 # Init scope variables
+                 gt_labels = None
+                
                  try:
-                    # 1. Save uploaded file (Skip for History MockFiles)
-                    is_history_file = hasattr(uploaded_file, 'from_history') and uploaded_file.from_history
-                    
-                    # Determine extension
-                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+                   # 1. Save uploaded file (Skip for History MockFiles)
                     temp_filename = f"temp_upload_{i}{file_ext}" # Use unique name
                     
                     if not is_history_file:
@@ -995,9 +995,13 @@ with tab2:
                         
                         # SAVE TO SQL
                         dummy_confs = [1.0] * len(predictions)
-                        save_success = save_results_to_sql(uploaded_file.name, predictions, dummy_confs, selected_model_name)
+                        # Append suffix for display in history: SC4001E.parquet -> SC4001E_processed.parquet
+                        base, ext = os.path.splitext(uploaded_file.name)
+                        processed_filename = f"{base}_processed{ext}"
+                        
+                        save_success = save_results_to_sql(processed_filename, predictions, dummy_confs, selected_model_name)
                         if save_success:
-                            st.toast(f"Saved {uploaded_file.name} to history!")
+                            st.toast(f"Saved {processed_filename} to history!")
                             # Cleanup suffix logic here if needed
                                  
                         progress_bar.progress(100)
