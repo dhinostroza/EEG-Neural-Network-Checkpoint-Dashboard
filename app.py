@@ -223,6 +223,34 @@ TRANSLATIONS = {
         "en": "Count",
         "es": "Conteo"
     },
+    "pred_counts": {
+        "en": "Prediction Counts",
+        "es": "Conteo de Predicciones"
+    },
+    "pred_stage": {
+        "en": "Predicted Stage",
+        "es": "Etapa Predicha"
+    },
+    "class_index": {
+        "en": "Class Index",
+        "es": "Índice de Clase"
+    },
+    "overall_acc": {
+        "en": "Overall Accuracy",
+        "es": "Precisión Global"
+    },
+    "pred_table_title": {
+        "en": "Model Predictions",
+        "es": "Predicciones del Modelo"
+    },
+    "results_title": {
+        "en": "Detailed Results",
+        "es": "Resultados Detallados"
+    },
+    "comp_title": {
+        "en": "Ground Truth Comparison",
+        "es": "Comparación con Ground Truth"
+    },
     "stage_wake": {
         "en": "Wake",
         "es": "Vigilia"
@@ -886,19 +914,16 @@ with tab2:
                          # This relies on cached_preds being present.
                          input_df = pd.DataFrame() 
                     
-                    # --- XML MATCHING & PARSING ---
-                    # Check if any uploaded XML matches this file
-                    # File: SC4012E.parquet -> we look for SC4012... in xml_files_map
-                    if not is_history_file:
-                        # Extract core ID from data filename (e.g. SC4012)
-                        # Sleep-EDF: SC4012E0-PSG.edf -> SC4012
-                        base_id = uploaded_file.name[:6] # First 6 chars is a good heuristic for Sleep-EDF/SHHS
-                                    min_len = min(len(input_df), len(gt_labels))
-                                    input_df['label'] = pd.Series(gt_labels[:min_len])
-                                    # Also ensure 'stage' or 'sleep_stage' is set for compatibility
-                                    input_df['stage'] = input_df['label']
-                            else:
-                                st.warning(f"Could not extract labels from {matched_xml.name}")
+                    # --- MERGE GROUND TRUTH IF FOUND ---
+                    if gt_labels and not input_df.empty:
+                        # Truncate to min length
+                        min_len = min(len(input_df), len(gt_labels))
+                        input_df['label'] = pd.Series(gt_labels[:min_len])
+                        # Also ensure 'stage' or 'sleep_stage' is set for compatibility
+                        input_df['stage'] = input_df['label']
+                        
+                        # Debug info
+                        # st.write(f"Updated DF with {min_len} labels")
 
                     predictions = []
                     
@@ -1009,7 +1034,7 @@ with tab2:
                         st.altair_chart(chart, width="stretch")
                         
                         # Prediction Counts Row (Metrics)
-                        st.markdown("##### Prediction Counts")
+                        st.markdown(f"##### {t('pred_counts')}")
                         p_counts = input_df['predicted_label'].value_counts()
                         
                         # Create 5 columns for W, N1, N2, N3, REM
@@ -1044,14 +1069,14 @@ with tab2:
                     
                     # --- Detailed Results Tables (Side-by-Side) ---
                     st.divider()
-                    st.markdown(f"### {t('results_title') if 'results_title' in TRANSLATIONS else 'Detailed Results'}")
+                    st.markdown(f"### {t('results_title')}")
                     
                     # Create 2 Columns for Tables
                     tbl_col1, tbl_col2 = st.columns(2)
                     
                     # --- LEFT TABLE: Model Predictions ---
                     with tbl_col1:
-                        st.markdown(f"#### {t('pred_table_title') if 'pred_table_title' in TRANSLATIONS else 'Model Predictions'}")
+                        st.markdown(f"#### {t('pred_table_title')}")
                         
                         # Add Epoch column if not present
                         if 'Epoch' not in input_df.columns:
@@ -1066,8 +1091,8 @@ with tab2:
                             height=400,
                             column_config={
                                 "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
-                                "predicted_label": st.column_config.TextColumn("Predicted Stage"),
-                                "predicted_mid": st.column_config.NumberColumn("Class Index")
+                                "predicted_label": st.column_config.TextColumn(t("pred_stage")),
+                                "predicted_mid": st.column_config.NumberColumn(t("class_index"))
                             }
                         )
                         
@@ -1086,7 +1111,7 @@ with tab2:
                          gt_col = next((c for c in ['label', 'stage', 'sleep_stage'] if c in input_df.columns), None)
                          
                          if gt_col:
-                            st.markdown(f"#### {t('comp_title') if 'comp_title' in TRANSLATIONS else 'Ground Truth Comparison'}")
+                            st.markdown(f"#### {t('comp_title')}")
                             
                             # Map numeric GT
                             input_df['true_label'] = input_df[gt_col].map(stage_map)
@@ -1096,7 +1121,7 @@ with tab2:
                             if valid_mask.any():
                                 correct = (input_df.loc[valid_mask, 'predicted_mid'] == input_df.loc[valid_mask, gt_col]).sum()
                                 accuracy = correct / valid_mask.sum()
-                                st.metric("Overall Accuracy", f"{accuracy:.2%}")
+                                st.metric(t("overall_acc"), f"{accuracy:.2%}")
                             
                             # Comparison DataFrame
                             comp_df = pd.DataFrame({
