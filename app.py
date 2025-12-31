@@ -4,6 +4,7 @@ import os
 import torch
 import time
 import altair as alt
+import xml.etree.ElementTree as ET
 from analyzer import CheckpointAnalyzer
 from inference import get_model, load_checkpoint_weights, preprocess_spectrogram, detect_architecture, convert_edf_to_parquet
 
@@ -300,6 +301,66 @@ with st.sidebar:
 def t(key):
     return TRANSLATIONS.get(key, {}).get(LANG, key)
 
+def extract_gt_from_xml(xml_path):
+    """
+    Parses Sleep-EDF (Hypnogram) or NSRR (Profusion) XMLs.
+    Returns a list of labels (0=W, 1=N1, etc.)
+    """
+    try:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        
+        labels = []
+        
+        # Map strings to our indices: 0=W, 1=N1, 2=N2, 3=N3, 4=REM
+        stage_map_str = {
+            'W': 0, '0': 0, 'Wake': 0,
+            '1': 1, 'N1': 1,
+            '2': 2, 'N2': 2,
+            '3': 3, 'N3': 3,
+            '4': 3, 'N4': 3, # Map Stage 4 to N3 (AASM)
+            'R': 4, 'REM': 4, '5': 4
+        }
+        
+        # 1. Sleep-EDF <SleepStage>
+        sleep_stages = root.findall(".//SleepStage")
+        durations = root.findall(".//Duration")
+        
+        if sleep_stages and durations and len(sleep_stages) == len(durations):
+            for stage_elem, dur_elem in zip(sleep_stages, durations):
+                stage_str = stage_elem.text
+                duration = float(dur_elem.text)
+                n_epochs = int(duration / 30)
+                label = stage_map_str.get(str(stage_str), -1) 
+                labels.extend([label] * n_epochs)
+            return labels
+
+        # 2. NSRR / Profusion <ScoredEvent>
+        scored_events = root.findall(".//ScoredEvent")
+        if scored_events:
+            for event in scored_events:
+                concept = event.find("EventConcept").text
+                duration = float(event.find("Duration").text)
+                
+                if "Sleep stage" in concept:
+                    label = -1
+                    if "W" in concept or "0" in concept: label = 0
+                    elif "N1" in concept or "1" in concept: label = 1
+                    elif "N2" in concept or "2" in concept: label = 2
+                    elif "N3" in concept or "3" in concept: label = 3
+                    elif "N4" in concept or "4" in concept: label = 3
+                    elif "R" in concept or "5" in concept: label = 4
+                    elif "Unscored" in concept or "?" in concept: label = -1
+                    
+                    n_epochs = int(duration / 30)
+                    labels.extend([label] * n_epochs)
+            return labels
+
+        return []
+    except Exception as e:
+        print(f"XML Parsing Error: {e}")
+        return []
+
 # --- Helpers ---
 def retrieve_from_sql(filename):
     """
@@ -569,13 +630,25 @@ with tab2:
         # --- Top Left: Uploader ---
         with col_top_upload:
             st.markdown(f"**{t('upload_label')}**")
-            uploaded_files = st.file_uploader(
+            uploaded_raw_files = st.file_uploader(
                 label=t("upload_label"),
-                type=["parquet", "edf"],
+                type=["parquet", "edf", "xml"], # Added XML
                 accept_multiple_files=True,
                 key="uploader_main",
                 label_visibility="collapsed"
             )
+            
+            # --- SEPARATE XML and DATA FILES ---
+            uploaded_files = []
+            xml_files_map = {} # filename_prefix -> xml_file_content (bytes or path)
+            
+            if uploaded_raw_files:
+                for uf in uploaded_raw_files:
+                     if uf.name.lower().endswith(".xml"):
+                         # Store XML for matching. Use match key logic later.
+                         xml_files_map[uf.name] = uf
+                     else:
+                         uploaded_files.append(uf)
             
         # --- Top Right: Model Selection ---
         with col_top_model:
@@ -714,6 +787,46 @@ with tab2:
                          # This relies on cached_preds being present.
                          input_df = pd.DataFrame() 
                     
+                    # --- XML MATCHING & PARSING ---
+                    # Check if any uploaded XML matches this file
+                    # File: SC4012E.parquet -> we look for SC4012... in xml_files_map
+                    if not is_history_file:
+                        # Extract core ID from data filename (e.g. SC4012)
+                        # Sleep-EDF: SC4012E0-PSG.edf -> SC4012
+                        base_id = uploaded_file.name[:6] # First 6 chars is a good heuristic for Sleep-EDF/SHHS
+                        
+                        matched_xml = None
+                        for xml_name, xml_uf in xml_files_map.items():
+                            if base_id in xml_name:
+                                matched_xml = xml_uf
+                                break
+                        
+                        if matched_xml:
+                            st.toast(f"Found Ground Truth: {matched_xml.name}", icon="✅")
+                            # Save XML temporarily to parse
+                            temp_xml_path = f"temp_{i}.xml"
+                            with open(temp_xml_path, "wb") as f:
+                                f.write(matched_xml.getbuffer())
+                            
+                            gt_labels = extract_gt_from_xml(temp_xml_path)
+                            
+                            # Clean up
+                            if os.path.exists(temp_xml_path): os.remove(temp_xml_path)
+                            
+                            if gt_labels:
+                                # Ensure validation: lengths might differ slightly due to cuts
+                                # We'll crop or pad matching the input_df (if exists) or prediction len later
+                                # For now, store in a temporary way or inject if input_df has index
+                                # If input_df is loaded (Parquet), we can try to add it now
+                                if not input_df.empty:
+                                    # Truncate to min length
+                                    min_len = min(len(input_df), len(gt_labels))
+                                    input_df['label'] = pd.Series(gt_labels[:min_len])
+                                    # Also ensure 'stage' or 'sleep_stage' is set for compatibility
+                                    input_df['stage'] = input_df['label']
+                            else:
+                                st.warning(f"Could not extract labels from {matched_xml.name}")
+
                     predictions = []
                     
                     # ------------------------------------------------------------------
