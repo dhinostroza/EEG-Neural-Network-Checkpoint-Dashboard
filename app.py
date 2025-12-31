@@ -848,14 +848,12 @@ with tab2:
                     
                     col_res1, col_res2 = st.columns(2)
                     with col_res1:
-                        st.write(t("dist_table"))
-                        st.dataframe(counts, width="stretch")
-                    
+                        st.dataframe(input_df[['predicted_label', 'predicted_mid']].head(10), use_container_width=True)
+                        
                     with col_res2:
-                        st.write(t("download_results"))
                         csv = input_df.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label=t("download_csv"),
+                            label=t("download_results"),
                             data=csv,
                             file_name=f"predictions_{uploaded_file.name}.csv",
                             mime="text/csv",
@@ -865,36 +863,72 @@ with tab2:
                     # ----------------------------------------------------------------------
                     # GROUND TRUTH COMPARISON
                     # ----------------------------------------------------------------------
-                    gt_col = None
-                    for potential_col in ['label', 'stage', 'sleep_stage', 'annotation']:
-                        if potential_col in input_df.columns:
-                            gt_col = potential_col
-                            break
+                    gt_col = next((c for c in ['label', 'stage', 'sleep_stage'] if c in input_df.columns), None)
                     
                     if gt_col:
-                        unique_vals = input_df[gt_col].unique()
-                        valid_labels = [v for v in unique_vals if v >= 0]
+                        # Map numeric GT to string
+                        input_df['true_label'] = input_df[gt_col].map(stage_map)
                         
-                        if valid_labels:
+                        # Only proceed if we have valid labels (not all -1 or None)
+                        if input_df[gt_col].notna().any():
                             st.divider()
-                            st.subheader("📊 Comparison with Ground Truth")
+                            st.subheader(t("comp_title") if "comp_title" in TRANSLATIONS else "Ground Truth Comparison")
                             
-                            comp_df = pd.DataFrame({
-                                "Epoch": range(len(input_df)),
-                                "Ground Truth (Index)": input_df[gt_col],
-                                "Predicted (Index)": input_df['predicted_mid'],
-                            })
+                            # Metrics
+                            valid_mask = input_df[gt_col] >= 0 # Assuming 0-4 are valid stages
+                            if valid_mask.any():
+                                correct = (input_df.loc[valid_mask, 'predicted_mid'] == input_df.loc[valid_mask, gt_col]).sum()
+                                total_valid = valid_mask.sum()
+                                accuracy = correct / total_valid
+                                
+                                m1, m2 = st.columns(2)
+                                m1.metric("Accuracy", f"{accuracy:.2%}")
+                                m2.caption(f"Matched {correct} out of {total_valid} valid epochs.")
                             
-                            comp_df["Ground Truth"] = comp_df["Ground Truth (Index)"].map(stage_map).fillna("Unknown")
-                            comp_df["Predicted"] = input_df['predicted_label']
-                            comp_df["Match"] = comp_df["Ground Truth (Index)"] == comp_df["Predicted (Index)"]
+                            # Layout for Charts
+                            c_charts = st.container()
                             
-                            acc = comp_df["Match"].mean() * 100
-                            st.markdown(f"**Agreement/Accuracy**: `{acc:.2f}%`")
+                            # 1. Side-by-Side Distribution
+                            st.markdown(f"#### {t('class_dist_comp') if 'class_dist_comp' in TRANSLATIONS else 'Class Distribution: Actual vs Predicted'}")
                             
-                            st.dataframe(comp_df[["Epoch", "Ground Truth", "Predicted", "Match"]], width="stretch", height=400)
-                        else:
-                            st.caption("No ground truth labels found (values are all -1/missing).")
+                            gt_counts = input_df.loc[valid_mask, 'true_label'].value_counts().reset_index()
+                            gt_counts.columns = [t("col_stage"), "count"]
+                            gt_counts["Type"] = "Ground Truth"
+                            
+                            pred_counts = input_df['predicted_label'].value_counts().reset_index()
+                            pred_counts.columns = [t("col_stage"), "count"]
+                            pred_counts["Type"] = "Predicted"
+                            
+                            combined_counts = pd.concat([gt_counts, pred_counts])
+                            
+                            chart_comp = alt.Chart(combined_counts).mark_bar().encode(
+                                x=alt.X(t("col_stage"), sort=['W', 'N1', 'N2', 'N3', 'REM']), # Sort order
+                                y=alt.Y("count", title=t("col_count")),
+                                color=alt.Color("Type", scale={"range": ['#4caf50', '#2196f3']}), # Green (GT) vs Blue (Pred)
+                                column=alt.Column("Type", title=None),
+                                tooltip=[t("col_stage"), "count", "Type"]
+                            ).properties(height=250)
+                            
+                            st.altair_chart(chart_comp, width="stretch")
+                            
+                            # 2. Hypnogram Comparison
+                            st.markdown(f"#### {t('hypno_comp') if 'hypno_comp' in TRANSLATIONS else 'Hypnogram Comparison (First 300 Epochs)'}")
+                            
+                            subset = input_df.head(300).reset_index()
+                            
+                            base = alt.Chart(subset).encode(x=alt.X('index', title="Epoch"))
+                            
+                            line_pred = base.mark_line(interpolate='step', color='#2196f3', size=2).encode(
+                                y=alt.Y('predicted_mid', title="Stage", scale=alt.Scale(domain=[0, 4])),
+                            )
+                            
+                            line_gt = base.mark_line(interpolate='step', strokeDash=[5, 5], color='#4caf50', size=2).encode(
+                                y=alt.Y(gt_col, title="Stage"),
+                            )
+                            
+                            st.altair_chart((line_gt + line_pred).properties(height=300), width="stretch")
+                            
+                            st.caption("Green (Dashed): Ground Truth | Blue (Solid): Predicted Model Output")
                  except Exception as e:
                      st.error(f"Error: {e}")
 
