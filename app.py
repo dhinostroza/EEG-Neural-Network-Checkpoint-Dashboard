@@ -1489,8 +1489,8 @@ with tab3:
                          # Load Best Model
                          c_model_path = os.path.join(BASE_DIR, selected_model_name) # selected_model_name is from sidebar
                          model = get_model(detect_architecture(selected_model_name), pretrained=False)
-                         weights = load_checkpoint_weights(c_model_path)
-                         model.load_state_dict(weights, strict=False)
+                         model, _ = load_checkpoint_weights(model, c_model_path)
+                         # model.load_state_dict(weights, strict=False) # Handled inside load_checkpoint_weights now
                          model.eval()
                          
                          # Chunked Inference
