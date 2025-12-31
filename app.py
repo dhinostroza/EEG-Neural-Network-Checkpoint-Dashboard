@@ -846,98 +846,63 @@ with tab2:
                         st.write(f"**{t('params_label')}**: {model_meta.get('params_m', 0):.2f} M")
                         st.caption(t("context_caption"))
                     
-                    # --- Detailed Results Tables ---
+                    # --- Detailed Results Tables (Side-by-Side) ---
                     st.divider()
                     st.markdown(f"### {t('results_title') if 'results_title' in TRANSLATIONS else 'Detailed Results'}")
                     
-                    # 1. Prediction Results Table
-                    st.markdown(f"#### {t('pred_table_title') if 'pred_table_title' in TRANSLATIONS else 'Model Predictions'}")
+                    # Create 2 Columns for Tables
+                    tbl_col1, tbl_col2 = st.columns(2)
                     
-                    # Prepare a clean display dataframe
-                    # Add Epoch column for clarity
-                    input_df['Epoch'] = range(len(input_df))
-                    
-                    # Reorder columns to show important info first
-                    display_cols = ['Epoch', 'predicted_label', 'predicted_mid']
-                    
-                    # If there are other useful columns in input_df (like timestamps), add them here
-                    # For now we stick to what we know exists
-                    
-                    st.dataframe(
-                        input_df[display_cols], 
-                        use_container_width=True, 
-                        height=300,
-                        column_config={
-                            "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
-                            "predicted_label": st.column_config.TextColumn("Predicted Stage"),
-                            "predicted_mid": st.column_config.NumberColumn("Class Index")
-                        }
-                    )
-                    
-                    # Download Button (Full CSV)
-                    csv = input_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label=t("download_results"),
-                        data=csv,
-                        file_name=f"predictions_{uploaded_file.name}.csv",
-                        mime="text/csv",
-                        key=f"download_{i}"
-                    )
+                    # --- LEFT TABLE: Model Predictions ---
+                    with tbl_col1:
+                        st.markdown(f"#### {t('pred_table_title') if 'pred_table_title' in TRANSLATIONS else 'Model Predictions'}")
                         
-                    # ----------------------------------------------------------------------
-                    # GROUND TRUTH COMPARISON
-                    # ----------------------------------------------------------------------
-                    gt_col = next((c for c in ['label', 'stage', 'sleep_stage'] if c in input_df.columns), None)
-                    
-                    if gt_col:
-                        # Map numeric GT to string
-                        input_df['true_label'] = input_df[gt_col].map(stage_map)
+                        # Add Epoch column if not present
+                        if 'Epoch' not in input_df.columns:
+                            input_df['Epoch'] = range(len(input_df))
                         
-                        # Only proceed if we have valid labels (not all -1 or None)
-                        if input_df[gt_col].notna().any():
-                            st.divider()
-                            st.subheader(t("comp_title") if "comp_title" in TRANSLATIONS else "Ground Truth Comparison")
+                        # Display Columns
+                        pred_display_cols = ['Epoch', 'predicted_label', 'predicted_mid']
+                        
+                        st.dataframe(
+                            input_df[pred_display_cols], 
+                            use_container_width=True, 
+                            height=400,
+                            column_config={
+                                "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
+                                "predicted_label": st.column_config.TextColumn("Predicted Stage"),
+                                "predicted_mid": st.column_config.NumberColumn("Class Index")
+                            }
+                        )
+                        
+                        # Download Button
+                        csv = input_df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label=t("download_results"),
+                            data=csv,
+                            file_name=f"predictions_{uploaded_file.name}.csv",
+                            mime="text/csv",
+                            key=f"download_{i}"
+                        )
+
+                    # --- RIGHT TABLE: Ground Truth Comparison ---
+                    with tbl_col2:
+                         gt_col = next((c for c in ['label', 'stage', 'sleep_stage'] if c in input_df.columns), None)
+                         
+                         if gt_col:
+                            st.markdown(f"#### {t('comp_title') if 'comp_title' in TRANSLATIONS else 'Ground Truth Comparison'}")
+                            
+                            # Map numeric GT
+                            input_df['true_label'] = input_df[gt_col].map(stage_map)
                             
                             # Metrics
-                            valid_mask = input_df[gt_col] >= 0 # Assuming 0-4 are valid stages
+                            valid_mask = input_df[gt_col] >= 0
                             if valid_mask.any():
                                 correct = (input_df.loc[valid_mask, 'predicted_mid'] == input_df.loc[valid_mask, gt_col]).sum()
-                                total_valid = valid_mask.sum()
-                                accuracy = correct / total_valid
-                                
-                                m1, m2 = st.columns(2)
-                                m1.metric("Accuracy", f"{accuracy:.2%}")
-                                m2.caption(f"Matched {correct} out of {total_valid} valid epochs.")
+                                accuracy = correct / valid_mask.sum()
+                                st.metric("Overall Accuracy", f"{accuracy:.2%}")
                             
-                            # Layout for Charts
-                            c_charts = st.container()
-                            
-                            # 1. Side-by-Side Distribution Chart
-                            st.markdown(f"#### {t('class_dist_comp') if 'class_dist_comp' in TRANSLATIONS else 'Class Distribution: Actual vs Predicted'}")
-                            
-                            gt_counts = input_df.loc[valid_mask, 'true_label'].value_counts().reset_index()
-                            gt_counts.columns = [t("col_stage"), "count"]
-                            gt_counts["Type"] = "Ground Truth"
-                            
-                            pred_counts = input_df['predicted_label'].value_counts().reset_index()
-                            pred_counts.columns = [t("col_stage"), "count"]
-                            pred_counts["Type"] = "Predicted"
-                            
-                            combined_counts = pd.concat([gt_counts, pred_counts])
-                            
-                            chart_comp = alt.Chart(combined_counts).mark_bar().encode(
-                                x=alt.X(t("col_stage"), sort=['W', 'N1', 'N2', 'N3', 'REM']), 
-                                y=alt.Y("count", title=t("col_count")),
-                                color=alt.Color("Type", scale={"range": ['#4caf50', '#2196f3']}), 
-                                column=alt.Column("Type", title=None),
-                                tooltip=[t("col_stage"), "count", "Type"]
-                            ).properties(height=250)
-                            
-                            st.altair_chart(chart_comp, width="stretch")
-                            
-                            # 2. Detailed Comparison Table (Replacing simple hypnogram for now if table is preferred, or adding potential)
-                            st.markdown(f"#### Detailed Comparison Table")
-                            
+                            # Comparison DataFrame
                             comp_df = pd.DataFrame({
                                 "Epoch": input_df['Epoch'],
                                 "Ground Truth": input_df['true_label'],
@@ -951,27 +916,63 @@ with tab2:
                                 height=400,
                                 column_config={
                                     "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
-                                    "Match": st.column_config.CheckboxColumn("Match")
-                                }
+                                    "Match": st.column_config.CheckboxColumn("Match"),
+                                    "Ground Truth": st.column_config.TextColumn("Ground Truth"),
+                                    "Predicted": st.column_config.TextColumn("Predicted")
+                               , }
                             )
-
-                            # 3. Hypnogram Comparison
-                            st.markdown(f"#### {t('hypno_comp') if 'hypno_comp' in TRANSLATIONS else 'Hypnogram Comparison (First 300 Epochs)'}")
-                            
-                            subset = input_df.head(300).reset_index(drop=True).reset_index()
-                            
-                            base = alt.Chart(subset).encode(x=alt.X('index', title="Epoch"))
-                            
-                            line_pred = base.mark_line(interpolate='step', color='#2196f3', size=2).encode(
-                                y=alt.Y('predicted_mid', title="Stage", scale=alt.Scale(domain=[0, 4])),
-                            )
-                            
-                            line_gt = base.mark_line(interpolate='step', strokeDash=[5, 5], color='#4caf50', size=2).encode(
-                                y=alt.Y(gt_col, title="Stage"),
-                            )
-                            
-                            st.altair_chart((line_gt + line_pred).properties(height=300), width="stretch")
-                            st.caption("Green (Dashed): Ground Truth | Blue (Solid): Predicted Model Output")
+                         else:
+                             st.markdown("#### Comparison")
+                             st.info("No Ground Truth labels found in this file.")
+                             
+                    # --- CHARTS (Below tables or above? User asked for DETAILED RESULTS in tables) ---
+                    # Ensuring charts are still present (they were earlier in code, lines ~920 in previous version)
+                    # We need to make sure we didn't accidentally delete the charts by overwriting too much.
+                    # Based on my previous logical block, charts were *inside* the GT block. 
+                    # Providing Charts *below* the tables if GT exists to ensure completeness.
+                    
+                    if gt_col and input_df[gt_col].notna().any():
+                         st.divider()
+                         st.markdown("### Visual Comparison")
+                         
+                         # Charts Container
+                         c_charts = st.container()
+                         
+                         valid_mask = input_df[gt_col] >= 0
+                         
+                         gt_counts = input_df.loc[valid_mask, 'true_label'].value_counts().reset_index()
+                         gt_counts.columns = [t("col_stage"), "count"]
+                         gt_counts["Type"] = "Ground Truth"
+                         
+                         pred_counts = input_df['predicted_label'].value_counts().reset_index()
+                         pred_counts.columns = [t("col_stage"), "count"]
+                         pred_counts["Type"] = "Predicted"
+                         
+                         combined_counts = pd.concat([gt_counts, pred_counts])
+                         
+                         chart_comp = alt.Chart(combined_counts).mark_bar().encode(
+                            x=alt.X(t("col_stage"), sort=['W', 'N1', 'N2', 'N3', 'REM']), 
+                            y=alt.Y("count", title=t("col_count")),
+                            color=alt.Color("Type", scale={"range": ['#4caf50', '#2196f3']}), 
+                            column=alt.Column("Type", title=None),
+                            tooltip=[t("col_stage"), "count", "Type"]
+                         ).properties(height=250)
+                         
+                         st.altair_chart(chart_comp, width="stretch")
+                         
+                         # Hypnogram
+                         st.markdown(f"#### {t('hypno_comp') if 'hypno_comp' in TRANSLATIONS else 'Hypnogram Comparison (First 300 Epochs)'}")
+                         subset = input_df.head(300).reset_index(drop=True).reset_index()
+                         base = alt.Chart(subset).encode(x=alt.X('index', title="Epoch"))
+                         
+                         line_pred = base.mark_line(interpolate='step', color='#2196f3', size=2).encode(
+                            y=alt.Y('predicted_mid', title="Stage", scale=alt.Scale(domain=[0, 4])),
+                         )
+                         line_gt = base.mark_line(interpolate='step', strokeDash=[5, 5], color='#4caf50', size=2).encode(
+                            y=alt.Y(gt_col, title="Stage"),
+                         )
+                         st.altair_chart((line_gt + line_pred).properties(height=300), width="stretch")
+                         st.caption("Green (Dashed): Ground Truth | Blue (Solid): Predicted Model Output")
                  except Exception as e:
                      st.error(f"Error: {e}")
 
