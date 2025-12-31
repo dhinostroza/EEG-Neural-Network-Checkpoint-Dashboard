@@ -709,7 +709,7 @@ with tab2:
                          st.markdown(f"**{t('files_label')}:** {n_files}")
                          st.markdown(f"**{t('params_label')}:** {lr}, {weights}, {workers}")
                     
-                     st.divider()
+                    st.divider()
                  else:
                     selected_model_name = None
 
