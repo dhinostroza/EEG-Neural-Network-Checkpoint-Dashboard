@@ -134,11 +134,11 @@ TRANSLATIONS = {
     },
     "history_label": {
         "en": "Processed Files",
-        "es": "Archivos Procesados"
+        "es": "Archivos procesados"
     },
     "select_model_label": {
         "en": "Select Model",
-        "es": "Seleccionar Modelo"
+        "es": "Seleccionar modelo"
     },
     "params_label": {
         "en": "Params",
