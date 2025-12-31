@@ -913,17 +913,48 @@ with tab2:
                             st.dataframe(
                                 comp_df,
                                 use_container_width=True,
-                                height=400,
+                                height=300,
                                 column_config={
                                     "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
                                     "Match": st.column_config.CheckboxColumn("Match"),
                                     "Ground Truth": st.column_config.TextColumn("Ground Truth"),
                                     "Predicted": st.column_config.TextColumn("Predicted")
-                               , }
+                                }
                             )
+                            
+                            # --- CONFUSION MATRIX ---
+                            st.divider()
+                            st.markdown("#### Confusion Matrix")
+                            if valid_mask.any():
+                                # Create Confusion Matrix
+                                cm_df = pd.crosstab(
+                                    input_df.loc[valid_mask, 'true_label'], 
+                                    input_df.loc[valid_mask, 'predicted_label'], 
+                                    rownames=['Actual'], 
+                                    colnames=['Predicted']
+                                )
+                                # Ensure all stages are present if possible, or just show what's there
+                                st.dataframe(cm_df.style.background_gradient(cmap='Blues'), use_container_width=True)
+                            else:
+                                st.caption("No valid data for Confusion Matrix.")
+
                          else:
                              st.markdown("#### Comparison")
                              st.info("No Ground Truth labels found in this file.")
+
+                    # --- Prediction Counts Summary (Bottom Left or Full Width?) ---
+                    # Putting it in column 1 (Left) as requested "counts of the present result"
+                    with tbl_col1:
+                        st.divider()
+                        st.markdown("#### Prediction Counts")
+                        pred_counts_df = input_df['predicted_label'].value_counts().reset_index()
+                        pred_counts_df.columns = ["Stage", "Count"]
+                        # Sort by standard stage order if possible
+                        stage_order = {v: k for k, v in stage_map.items()} # Name -> Index
+                        pred_counts_df['Order'] = pred_counts_df['Stage'].map(lambda x: next((k for k, v in stage_map.items() if v == x), 99))
+                        pred_counts_df = pred_counts_df.sort_values('Order').drop(columns=['Order'])
+                        
+                        st.dataframe(pred_counts_df, use_container_width=True, hide_index=True)
                              
                     # --- CHARTS (Below tables or above? User asked for DETAILED RESULTS in tables) ---
                     # Ensuring charts are still present (they were earlier in code, lines ~920 in previous version)
