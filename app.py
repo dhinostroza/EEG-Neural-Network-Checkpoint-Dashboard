@@ -896,6 +896,10 @@ with tab2:
                 
                  try:
                    # 1. Save uploaded file (Skip for History MockFiles)
+                    is_history_file = hasattr(uploaded_file, 'from_history') and uploaded_file.from_history
+                    
+                    # Determine extension
+                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
                     temp_filename = f"temp_upload_{i}{file_ext}" # Use unique name
                     
                     if not is_history_file:
