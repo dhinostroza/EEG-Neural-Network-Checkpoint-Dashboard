@@ -99,6 +99,10 @@ TRANSLATIONS = {
         "en": "No models available. Please scan checkpoints first.",
         "es": "No hay modelos disponibles. Escanee checkpoints primero."
     },
+    "model_label": {
+        "en": "Model",
+        "es": "Modelo"
+    },
     "arch": {
         "en": "Architecture",
         "es": "Arquitectura"
@@ -123,6 +127,18 @@ TRANSLATIONS = {
     "files_label": {
         "en": "Files",
         "es": "Archivos"
+    },
+    "params_label": {
+        "en": "Params",
+        "es": "Parámetros"
+    },
+    "history_label": {
+        "en": "Processed Files",
+        "es": "Archivos Procesados"
+    },
+    "select_model_label": {
+        "en": "Select Model",
+        "es": "Seleccionar Modelo"
     },
     "params_label": {
         "en": "Params",
@@ -512,9 +528,8 @@ with tab2:
     
     # --- COLUMN 1: History List ---
     with col_history:
-        # Smaller header as requested
-        header_text = t("history_label") if "history_label" in TRANSLATIONS else "Processed Files"
-        st.markdown(f"**📂 {header_text}**")
+        # Standardized Header
+        st.markdown(f"**{t('history_label')}**")
         
         if processed_files:
              df_files = pd.DataFrame({"filename": processed_files})
@@ -543,12 +558,14 @@ with tab2:
 
     # --- COLUMN 2: Uploader ---
     with col_upload:
-        # Uploader with compact label
+        # Standardized Header
+        st.markdown(f"**{t('upload_label')}**")
         uploaded_files = st.file_uploader(
             label=t("upload_label"),
             type=["parquet", "edf"],
             accept_multiple_files=True,
-            key="uploader_main"
+            key="uploader_main",
+            label_visibility="collapsed"
         )
         
     # --- COLUMN 3: Results & Model Info ---
@@ -569,11 +586,15 @@ with tab2:
                 # Find index of best model in the list
                 default_index = model_options.index(best_model_name) if best_model_name in model_options else 0
                 
+                # Standardized Header
+                st.markdown(f"**{t('select_model_label')}**")
+                
                 selected_model_name = st.selectbox(
-                    t("select_model_label") if "select_model_label" in TRANSLATIONS else "Select Model / Seleccionar Modelo",
+                    label=t("select_model_label"),
                     options=model_options,
                     index=default_index,
-                    key="model_selector"
+                    key="model_selector",
+                    label_visibility="collapsed"
                 )
                 
                 # Get the row for the SELECTED model
@@ -581,7 +602,7 @@ with tab2:
                 model_meta = selected_model_row # Update global meta reference
                 
                 # Restore detailed info
-                st.subheader(f"🧠 Model: {selected_model_name}")
+                st.markdown(f"**Model: {selected_model_name}**")
                 
                 # Extract meta
                 lr = selected_model_row.get('lr', 'N/A')
