@@ -998,25 +998,46 @@ with tab2:
                         global_status_container.info(t("running_inf").format(len(input_df)))
                         
                         # Inference Loop
+                        # Inference Loop (Batched & Vectorized for Speed)
                         with torch.no_grad():
-                            total = len(input_df)
-                            for j in range(total):
-                                row = input_df.iloc[j]
-                                cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage', 'true_label'] if c in input_df.columns]
-                                if cols_to_drop:
-                                    flat_data = row.drop(cols_to_drop).values
-                                else:
-                                    flat_data = row.values
+                            # Prepare Data (Vectorized)
+                            cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage', 'true_label'] if c in input_df.columns]
+                            if cols_to_drop:
+                                data_values = input_df.drop(columns=cols_to_drop).values
+                            else:
+                                data_values = input_df.values
+                            
+                            total = len(data_values)
+                            batch_size = 64
+                            predictions = []
+                            
+                            # Log-progress only every few batches
+                            log_interval = max(1, total // (batch_size * 5))
+                            
+                            for batch_idx, start_idx in enumerate(range(0, total, batch_size)):
+                                end_idx = min(start_idx + batch_size, total)
                                 
-                                input_tensor = preprocess_spectrogram(flat_data)
-                                input_tensor = input_tensor.unsqueeze(0)
+                                # 1. Get Batch (N, 4560)
+                                batch_flat = data_values[start_idx:end_idx].astype(np.float32)
                                 
+                                # 2. Preprocess Vectorized (Match preprocess_spectrogram logic)
+                                # Mean/Std per sample (axis 1)
+                                mean = batch_flat.mean(axis=1, keepdims=True)
+                                std = batch_flat.std(axis=1, keepdims=True)
+                                batch_norm = (batch_flat - mean) / (std + 1e-6)
+                                batch_reshaped = batch_norm.reshape(-1, 1, 76, 60)
+                                
+                                # 3. To Tensor
+                                input_tensor = torch.from_numpy(batch_reshaped)
+                                
+                                # 4. Forward Pass
                                 logits = model(input_tensor)
-                                pred_idx = torch.argmax(logits, dim=1).item()
-                                predictions.append(pred_idx)
+                                pred_batch = torch.argmax(logits, dim=1).tolist()
+                                predictions.extend(pred_batch)
                                 
-                                if j % max(1, int(total/10)) == 0:
-                                    prog = 30 + int(60 * (j / total))
+                                # Progress
+                                if batch_idx % log_interval == 0:
+                                    prog = 30 + int(60 * (end_idx / total))
                                     progress_bar.progress(prog)
                         
                         # SAVE TO SQL
@@ -1028,8 +1049,10 @@ with tab2:
                         save_success = save_results_to_sql(processed_filename, predictions, dummy_confs, selected_model_name)
                         if save_success:
                             st.toast(f"Saved {processed_filename} to history!")
-                            # Cleanup suffix logic here if needed
-                                 
+                            # Force sidebar update so suffix appears
+                            time.sleep(1) # Small delay for toast
+                            st.rerun()
+
                         progress_bar.progress(100)
                         global_status_container.success(f"{t('analysis_complete')}: {uploaded_file.name}")
                         progress_bar.empty()
