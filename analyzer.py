@@ -6,7 +6,8 @@ import re
 import datetime
 import pandas as pd
 
-CACHE_FILE = "analysis_cache.json"
+
+CACHE_FILE = "analysis_cache_v2.json" # Bumped version to force re-scan
 
 class CheckpointAnalyzer:
     def __init__(self, base_dir):
@@ -43,7 +44,14 @@ class CheckpointAnalyzer:
             "params_m": 0,
             "pl_version": "Unknown",
             "status": "Valid",
-            "error": None
+            "error": None,
+            # Initialize these to None/0 so we prefer the filename extracted ones
+            "date": "N/A", 
+            "time": "N/A",
+            "workers": 0,
+            "trained_on_files": 0,
+            "lr": "N/A",
+            "weighted_sampler": False
         }
 
         try:
@@ -70,28 +78,28 @@ class CheckpointAnalyzer:
                     meta["time"] = time_match.group(1).replace("-", ":")
 
                 # Workers
-                workers_match = re.search(r'workers(\d+)', filename)
+                workers_match = re.search(r'workers(\d+)', filename, re.IGNORECASE)
                 if workers_match:
                     meta["workers"] = int(workers_match.group(1))
 
                 # Files
-                files_match = re.search(r'(\d+)files', filename)
+                files_match = re.search(r'(\d+)files', filename, re.IGNORECASE)
                 if files_match:
                     meta["trained_on_files"] = int(files_match.group(1))
 
                 # LR
-                lr_match = re.search(r'lr([\deE\-\.]+)', filename)
+                lr_match = re.search(r'lr([\deE\-\.]+)', filename, re.IGNORECASE)
                 if lr_match:
                      meta["lr"] = lr_match.group(1)
 
                 # CW (Class Weights / Weighted Sampler)
-                if "cwn" in filename or "wrs" in filename:
+                if "cwn" in filename.lower() or "wrs" in filename.lower():
                     meta["weighted_sampler"] = True
                 
                 # Architecture from filename fallback
                 if meta["model_architecture"] == "Unknown":
                     for arch in ["convnext_base", "convnext_small", "convnext_tiny", "resnet18", "resnet50"]:
-                        if arch in filename:
+                        if arch in filename.lower():
                             meta["model_architecture"] = arch
                             break
             except Exception as parse_e:

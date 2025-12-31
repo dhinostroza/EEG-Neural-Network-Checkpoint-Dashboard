@@ -275,6 +275,11 @@ def inject_custom_css():
              background-color: transparent;
          }
          
+         /* Target specific scrollable containers if needed */
+         [data-testid="stVerticalBlock"] > div {
+             overflow-y: auto !important;
+         }
+         
          /* Firefox */
          * {
             scrollbar-width: thin;
