@@ -340,6 +340,22 @@ inject_custom_css()
 
 # Sidebar Language Selector (Placed First)
 with st.sidebar:
+    # 1. Logo and Header (Request: Match specific screenshot layout)
+    st.image("/Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/images/globo.svg", width=100)
+    
+    st.markdown("""
+    <div style="text-align: left; margin-top: 10px; margin-bottom: 20px;">
+        <p style="font-weight: bold; font-size: 0.9em; margin-bottom: 5px;">
+        Modelo de aprendizaje profundo para la detección de los patrones de onda cerebral N1 durante los periodos de sueño.
+        </p>
+        <p style="font-size: 0.85em; margin-bottom: 2px;">Universidad Politécnica Salesiana</p>
+        <p style="font-size: 0.85em; margin-bottom: 2px;">Tesis de grado</p>
+        <p style="font-weight: bold; font-size: 0.85em; margin-bottom: 2px;">Daniel Hinostroza, MD</p>
+        <p style="font-size: 0.85em;">2026-01-08</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 2. Language Selector
     # Index 0 is English, Index 1 is Español. Defaulting to 1 (Español)
     lang_selection = st.radio("Language / Idioma", ["English", "Español"], index=1)
     LANG = 'en' if lang_selection == 'English' else 'es'
@@ -583,26 +599,8 @@ if 'df_models' not in st.session_state:
     st.session_state.df_models = pd.DataFrame()
 
 # Sidebar Controls
+# Sidebar Controls
 with st.sidebar:
-    # Logo and Header Info
-    # Logo path: /Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/images/globo.svg
-    # We can use st.image.
-    
-    # Text from user request
-    st.image("/Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/images/globo.svg", width=100)
-    
-    st.markdown("""
-    <div style="text-align: left; margin-top: 10px;">
-        <p style="font-weight: bold; font-size: 0.9em; margin-bottom: 5px;">
-        Modelo de aprendizaje profundo para la detección de los patrones de onda cerebral N1 durante los periodos de sueño.
-        </p>
-        <p style="font-size: 0.85em; margin-bottom: 2px;">Universidad Politécnica Salesiana</p>
-        <p style="font-size: 0.85em; margin-bottom: 2px;">Tesis de grado</p>
-        <p style="font-weight: bold; font-size: 0.85em; margin-bottom: 2px;">Daniel Hinostroza, MD</p>
-        <p style="font-size: 0.85em;">2026-01-08</p>
-    </div>
-    """, unsafe_allow_html=True)
-
     st.divider()
     st.header(t("settings"))
     refresh_btn = st.button(t("refresh_btn"))
