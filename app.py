@@ -489,9 +489,9 @@ with tab1:
 with tab2:
     # Create layout: 3 Columns
     # Col 1: File List (Reduced width ~7%)
-    # Col 2: Uploader (5% wider than Col 1 -> ~12%)
-    # Col 3: Results (Rest ~80%)
-    col_history, col_upload, col_results = st.columns([0.7, 1.2, 8.1])
+    # Col 2: Uploader (Increased to ~17%)
+    # Col 3: Results (Rest ~76%)
+    col_history, col_upload, col_results = st.columns([0.7, 1.7, 7.6])
     
     selected_history_files = []
     
