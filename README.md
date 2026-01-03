@@ -34,7 +34,7 @@ Expected URL: `http://localhost:8501`
 
 ### 3. Inference
 *   Go to the **"Carga y resultados"** tab.
-*   Upload a `.parquet` file.
+*   Upload a `.parquet` or `.edf` file.
 *   Results (Sleep Stage labels and counts) will appear automatically.
 
 ## 🛠 Requirements
@@ -46,5 +46,5 @@ Expected URL: `http://localhost:8501`
     ```
 
 ## 📝 Notes
-*   **EDF Support**: The app accepts `.edf` files and tracks them. Full conversion logic from `.edf` to `{spectrogram}` is pending integration of the preprocessing module.
+*   **EDF Support**: Full support for `.edf` files. The app automatically converts uploaded `.edf` files to `.parquet` (spectrograms) using the integrated preprocessing module.
 *   **Git**: Large files (`.ckpt`, `.parquet`, `.edf`) are excluded via `.gitignore`.
