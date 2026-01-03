@@ -1001,6 +1001,42 @@ with tab2:
                     else: 
                          # Fallback
                          input_df = pd.DataFrame() 
+
+                    # --- XML / GROUND TRUTH LOOKUP ---
+                    # Logic: 
+                    # 1. Check if user explicitly uploaded an XML with matching name
+                    # 2. Check SHHS_XML_DIRS for matching file (e.g. shhs1-200001.nsrr.xml for shhs1-200001.parquet)
+                    
+                    base_name_clean = os.path.splitext(uploaded_file.name)[0].split('.')[0] # e.g. "shhs1-200001"
+                    # Handle _processed suffix
+                    if base_name_clean.endswith("_processed"):
+                        base_name_clean = base_name_clean.replace("_processed", "")
+                        
+                    found_xml_path = None
+                    
+                    # A. Check Uploads
+                    for xml_name, xml_file_obj in xml_files_map.items():
+                        if base_name_clean in xml_name:
+                             t_xml = f"temp_{xml_name}"
+                             with open(t_xml, "wb") as f:
+                                 f.write(xml_file_obj.getbuffer())
+                             found_xml_path = t_xml
+                             break
+                    
+                    # B. Check Local Directories
+                    if not found_xml_path:
+                        for search_dir in SHHS_XML_DIRS:
+                            if not os.path.exists(search_dir): continue
+                            candidates = glob.glob(os.path.join(search_dir, f"{base_name_clean}*.xml"))
+                            if candidates:
+                                found_xml_path = candidates[0]
+                                break
+                    
+                    if found_xml_path:
+                        st.caption(f"Found Ground Truth: `{os.path.basename(found_xml_path)}`")
+                        gt_labels = extract_gt_from_xml(found_xml_path)
+                    else:
+                        st.caption("No Ground Truth XML found.") 
                     
                     # --- MERGE GROUND TRUTH IF FOUND ---
                     if gt_labels and not input_df.empty:
