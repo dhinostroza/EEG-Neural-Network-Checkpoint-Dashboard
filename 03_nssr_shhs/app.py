@@ -434,6 +434,14 @@ def inject_custom_css():
             scrollbar-width: thin;
             scrollbar-color: rgba(100, 100, 100, 0.5) transparent;
          }
+
+         /* Reduce font size of sidebar checkboxes (File List) */
+         section[data-testid="stSidebar"] label[data-testid="stWidgetLabel"] p {
+             font-size: 0.85rem !important;
+         }
+         section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
+             font-size: 0.85rem !important;
+         }
         </style>
     """, unsafe_allow_html=True)
 
