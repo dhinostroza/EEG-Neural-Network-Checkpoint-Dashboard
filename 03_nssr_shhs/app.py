@@ -2606,11 +2606,11 @@ with tab_glossary:
     
     
     column_config = {
-        "Término (Español)": st.column_config.TextColumn(width="small"),
-        "Término (Inglés)": st.column_config.TextColumn(width="small"),
+        "Término (Español)": st.column_config.TextColumn(width=130),
+        "Término (Inglés)": st.column_config.TextColumn(width=130),
         "Descripción": st.column_config.TextColumn(width="large"),
-        "Term (Spanish)": st.column_config.TextColumn(width="small"),
-        "Term (English)": st.column_config.TextColumn(width="small"),
+        "Term (Spanish)": st.column_config.TextColumn(width=130),
+        "Term (English)": st.column_config.TextColumn(width=130),
         "Description": st.column_config.TextColumn(width="large"),
     }
 
