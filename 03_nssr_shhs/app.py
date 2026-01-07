@@ -2591,28 +2591,23 @@ with tab_glossary:
     df_glossary = pd.DataFrame(sorted_terms)
     
     # Rename and Reorder columns for display
+    
     if LANG == 'es':
         display_df = df_glossary[["es", "en", "desc"]]
-        display_df.columns = ["Término (Español)", "Término (Inglés)", "Descripción"]
-        main_col = "Término (Español)"
+        display_df.columns = ["Español", "Inglés", "Descripción"]
+        column_config = {
+            "Español": st.column_config.TextColumn(width="small"),
+            "Inglés": st.column_config.TextColumn(width="small"),
+            "Descripción": st.column_config.TextColumn(width="large"),
+        }
     else:
         display_df = df_glossary[["es", "en", "desc"]]
-        display_df.columns = ["Term (Spanish)", "Term (English)", "Description"]
-        main_col = "Term (Spanish)"
-        
-    # Render static table to remove scrollbars and show entire content
-    # We use custom CSS to ensure the index and first content column stay wide enough
-
-    
-    
-    column_config = {
-        "Término (Español)": st.column_config.TextColumn(width=50),
-        "Término (Inglés)": st.column_config.TextColumn(width=50),
-        "Descripción": st.column_config.TextColumn(width="large"),
-        "Term (Spanish)": st.column_config.TextColumn(width=50),
-        "Term (English)": st.column_config.TextColumn(width=50),
-        "Description": st.column_config.TextColumn(width="large"),
-    }
+        display_df.columns = ["Spanish", "English", "Description"]
+        column_config = {
+            "Spanish": st.column_config.TextColumn(width="small"),
+            "English": st.column_config.TextColumn(width="small"),
+            "Description": st.column_config.TextColumn(width="large"),
+        }
 
     st.dataframe(
         display_df, 
