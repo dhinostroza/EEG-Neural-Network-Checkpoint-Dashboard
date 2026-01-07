@@ -435,12 +435,14 @@ def inject_custom_css():
             scrollbar-color: rgba(100, 100, 100, 0.5) transparent;
          }
 
-         /* Reduce font size of sidebar checkboxes (File List) */
-         section[data-testid="stSidebar"] label[data-testid="stWidgetLabel"] p {
+         /* Reduce font size of checkboxes (File List) */
+         div[data-testid="stCheckbox"] label p {
              font-size: 0.85rem !important;
          }
-         section[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
-             font-size: 0.85rem !important;
+         
+         /* Remove default padding to make list tighter */
+         div[data-testid="stCheckbox"] {
+             min-height: 0px;
          }
         </style>
     """, unsafe_allow_html=True)
@@ -1604,7 +1606,8 @@ with tab2:
     # Col 1: Sidebar-like File List (Full height)
     # Col 2: Main Content (Uploader/Model on top, Results below)
     # Adjusted ratios for better spacing (Ref: User Image)
-    col_left_sidebar, col_main_content = st.columns([1.0, 9.0])
+    # Adjusted ratios to widen the file list column
+    col_left_sidebar, col_main_content = st.columns([1.5, 8.5])
     
     selected_history_files = []
     
@@ -1614,6 +1617,15 @@ with tab2:
         st.markdown(f"**{t('history_label')}**")
         
         if processed_files:
+             # Bulk Actions
+             col_sel, col_clr = st.columns(2)
+             if col_sel.button("Select All", key="btn_sel_all", use_container_width=True):
+                 for f in processed_files:
+                     st.session_state[f"hist_{f}"] = True
+             if col_clr.button("Clear", key="btn_clr_all", use_container_width=True):
+                 for f in processed_files:
+                     st.session_state[f"hist_{f}"] = False
+
              # Container with fixed height for scrolling (Sidebar behavior)
              # Using st.checkbox ensures clicking the name toggles selection
              with st.container(height=700, border=True):
