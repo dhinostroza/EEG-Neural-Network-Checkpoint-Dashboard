@@ -1,0 +1,80 @@
+INFO:     Started server process [39499]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60338 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60354 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60679 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60679 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60679 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60690 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60696 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60739 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60822 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60824 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 20
+INFO:     127.0.0.1:60848 - "GET /api/project/01/results?stage=20 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 20
+INFO:     127.0.0.1:60848 - "GET /api/project/01/results?stage=20 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 20
+INFO:     127.0.0.1:60848 - "GET /api/project/01/results?stage=20 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60890 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60901 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:60970 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61205 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61543 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61552 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61591 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61600 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61600 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61636 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61636 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61730 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61730 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61730 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61779 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61794 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61823 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61844 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:61861 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:63478 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:63568 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:63588 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:main:Received request for stage: 8
+INFO:     127.0.0.1:63608 - "GET /api/project/01/results?stage=8 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [39499]

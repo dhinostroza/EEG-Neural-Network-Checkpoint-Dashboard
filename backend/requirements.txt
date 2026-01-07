@@ -8,3 +8,6 @@ chromadb
 pypdf
 python-multipart
 sentence-transformers
+scipy
+numpy
+h5py

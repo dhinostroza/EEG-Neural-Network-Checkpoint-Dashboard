@@ -4,7 +4,8 @@
 
 @font-face {
   font-family: 'Trajan Pro';
-  src: local('Trajan Pro'), local('TrajanPro-Regular'), url('https://db.onlinewebfonts.com/t/1db29588408eadbd4406aae92e599712.woff2') format('woff2'); /* Fallback URL just in case, preferably local */
+  src: local('Trajan Pro'), local('TrajanPro-Regular'), url('https://db.onlinewebfonts.com/t/1db29588408eadbd4406aae92e599712.woff2') format('woff2');
+  /* Fallback URL just in case, preferably local */
   font-weight: normal;
   font-style: normal;
 }

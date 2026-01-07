@@ -1,0 +1,29 @@
+# Checkpoints (too large for GH)
+*.ckpt*
+*.ckpt_delete
+
+# Data
+*.parquet
+*.npy
+*.edf
+
+# Cache and Logs
+analysis_cache.json
+analysis_cache_v2.json
+__pycache__/
+*.pyc
+.DS_Store
+
+# Virtual Env
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Generated Output
+predictions.sql
+processed_files.log
+temp_upload_*.parquet
+temp_upload_*.edf
