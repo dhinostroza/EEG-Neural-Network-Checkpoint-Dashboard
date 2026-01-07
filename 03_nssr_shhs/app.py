@@ -2596,16 +2596,16 @@ with tab_glossary:
         display_df = df_glossary[["es", "en", "desc"]]
         display_df.columns = ["Español", "Inglés", "Descripción"]
         column_config = {
-            "Español": st.column_config.TextColumn(width="small"),
-            "Inglés": st.column_config.TextColumn(width="small"),
+            "Español": st.column_config.TextColumn(width=100),
+            "Inglés": st.column_config.TextColumn(width=100),
             "Descripción": st.column_config.TextColumn(width="large"),
         }
     else:
         display_df = df_glossary[["es", "en", "desc"]]
         display_df.columns = ["Spanish", "English", "Description"]
         column_config = {
-            "Spanish": st.column_config.TextColumn(width="small"),
-            "English": st.column_config.TextColumn(width="small"),
+            "Spanish": st.column_config.TextColumn(width=100),
+            "English": st.column_config.TextColumn(width=100),
             "Description": st.column_config.TextColumn(width="large"),
         }
 
