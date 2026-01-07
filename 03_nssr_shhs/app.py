@@ -1756,12 +1756,41 @@ with tab2:
         
         # --- GLOBAL STATUS AREA ---
         # User wants to see progress "here" (below uploader)
+        # Added "Run Analysis" button to prevent auto-execution
+        
+        # Dynamic Button Color: Red (Default) -> Green (If files selected)
+        files_for_analysis_present = bool(uploaded_files or selected_history_files)
+        if files_for_analysis_present:
+            st.markdown("""
+            <style>
+            div.stButton > button[kind="primary"] {
+                background-color: #28a745 !important;
+                border-color: #28a745 !important;
+            }
+            div.stButton > button[kind="primary"]:hover {
+                background-color: #218838 !important;
+                border-color: #1e7e34 !important;
+            }
+            div.stButton > button[kind="primary"]:active {
+                background-color: #1e7e34 !important;
+                border-color: #1e7e34 !important;
+            }
+            /* Change focus ring if needed */
+            div.stButton > button[kind="primary"]:focus:not(:active) {
+                border-color: #28a745 !important;
+                box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.5) !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+        run_btn = st.button(t("analyze_btn"), type="primary", use_container_width=True)
+        
         global_status_container = st.empty()
 
         # --- RESULTS AREA (Full Main Column Width) ---
-        # Auto-trigger analysis
-        # Only run if files are present AND model is selected
-        if (uploaded_files or selected_history_files) and selected_model_name:
+        # Auto-trigger analysis -> NOW MANUAL via button
+        # Only run if files are present AND model is selected AND button is clicked
+        if run_btn and (uploaded_files or selected_history_files) and selected_model_name:
              # Determine source: History OR Upload
              files_to_process = []
              if selected_history_files:
