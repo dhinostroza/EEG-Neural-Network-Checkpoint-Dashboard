@@ -2604,6 +2604,22 @@ with tab_glossary:
     # We use custom CSS to ensure the index and first content column stay wide enough
 
     
-    st.dataframe(display_df, use_container_width=True, hide_index=True, height=700)
+    
+    column_config = {
+        "Término (Español)": st.column_config.TextColumn(width="small"),
+        "Término (Inglés)": st.column_config.TextColumn(width="small"),
+        "Descripción": st.column_config.TextColumn(width="large"),
+        "Term (Spanish)": st.column_config.TextColumn(width="small"),
+        "Term (English)": st.column_config.TextColumn(width="small"),
+        "Description": st.column_config.TextColumn(width="large"),
+    }
+
+    st.dataframe(
+        display_df, 
+        use_container_width=True, 
+        hide_index=True, 
+        height=700,
+        column_config=column_config
+    )
 
 
