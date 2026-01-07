@@ -2573,7 +2573,7 @@ with tab_glossary:
     importlib.reload(cols_glossary)
     from cols_glossary import GLOSSARY_TERMS
     
-    st.header("Glosario de Términos" if LANG == 'es' else "Glossary of Terms")
+    st.header("Glosario de términos" if LANG == 'es' else "Glossary of Terms")
     
     st.markdown("""
     Esta sección define los términos técnicos clave utilizados en este proyecto, 
@@ -2606,11 +2606,11 @@ with tab_glossary:
     
     
     column_config = {
-        "Término (Español)": st.column_config.TextColumn(width=90),
-        "Término (Inglés)": st.column_config.TextColumn(width=90),
+        "Término (Español)": st.column_config.TextColumn(width=50),
+        "Término (Inglés)": st.column_config.TextColumn(width=50),
         "Descripción": st.column_config.TextColumn(width="large"),
-        "Term (Spanish)": st.column_config.TextColumn(width=90),
-        "Term (English)": st.column_config.TextColumn(width=90),
+        "Term (Spanish)": st.column_config.TextColumn(width=50),
+        "Term (English)": st.column_config.TextColumn(width=50),
         "Description": st.column_config.TextColumn(width="large"),
     }
 
