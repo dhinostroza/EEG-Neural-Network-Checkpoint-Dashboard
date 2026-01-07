@@ -445,21 +445,33 @@ with st.sidebar:
     # 1. Logo and Header (Request: Match specific screenshot layout)
     st.image("/Users/dhinostroza/.gemini/antigravity/scratch/tesis-app/images/globo.svg", width=100)
     
-    st.markdown("""
+    lang_selection = st.radio("Language / Idioma", ["English", "Español"], index=1)
+    LANG = 'en' if lang_selection == 'English' else 'es'
+
+    # Define Cover/Sidebar Texts
+    if LANG == 'es':
+        c_title = "Modelo de aprendizaje profundo para la detección de los patrones de onda cerebral N1 durante los periodos de sueño."
+        c_uni = "Universidad Politécnica Salesiana"
+        c_degree = "Tesis de grado"
+        c_tutor = "Tutor:"
+        c_student = "Estudiante:"
+    else:
+        c_title = "Deep learning model for the detection of N1 brain wave patterns during sleep periods."
+        c_uni = "Salesian Polytechnic University"
+        c_degree = "Bachelor's Thesis"
+        c_tutor = "Advisor:"
+        c_student = "Student:"
+
+    st.markdown(f"""
     <div style="text-align: left; margin-top: 10px; margin-bottom: 20px;">
         <p style="font-weight: bold; font-size: 0.9em; margin-bottom: 5px;">
-        Modelo de aprendizaje profundo para la detección de los patrones de onda cerebral N1 durante los periodos de sueño.
+        {c_title}
         </p>
-        <p style="font-size: 0.85em; margin-bottom: 2px;">Universidad Politécnica Salesiana</p>
-        <p style="font-size: 0.85em; margin-bottom: 2px;">Tesis de grado</p>
+        <p style="font-size: 0.85em; margin-bottom: 2px;">{c_uni}</p>
+        <p style="font-size: 0.85em; margin-bottom: 2px;">{c_degree}</p>
         <p style="font-size: 0.85em;">2026-01-08</p>
     </div>
     """, unsafe_allow_html=True)
-
-    # 2. Language Selector
-    # Index 0 is English, Index 1 is Español. Defaulting to 1 (Español)
-    lang_selection = st.radio("Language / Idioma", ["English", "Español"], index=1)
-    LANG = 'en' if lang_selection == 'English' else 'es'
 
 def t(key):
     return TRANSLATIONS.get(key, {}).get(LANG, key)
@@ -843,18 +855,34 @@ tab_portada, tab_env, tab_scripts, tab1, tab2, tab3, tab4, tab_glossary = st.tab
 # ==============================================================================
 # TAB -1: PORTADA (Thesis Info)
 # ==============================================================================
+# ==============================================================================
+# TAB -1: PORTADA (Thesis Info)
+# ==============================================================================
 with tab_portada:
-    st.markdown("""
+    if LANG == 'es':
+        c_title = "Modelo de aprendizaje profundo para la detección de los patrones de onda cerebral N1 durante los periodos de sueño."
+        c_uni = "Universidad Politécnica Salesiana"
+        c_degree = "Tesis de grado"
+        c_tutor = "Tutor:"
+        c_student = "Estudiante:"
+    else:
+        c_title = "Deep learning model for the detection of N1 brain wave patterns during sleep periods."
+        c_uni = "Salesian Polytechnic University"
+        c_degree = "Bachelor's Thesis"
+        c_tutor = "Advisor:"
+        c_student = "Student:"
+
+    st.markdown(f"""
     <div style="text-align: center; margin-top: 50px; margin-bottom: 2rem;">
-        <h1 style="font-size: 2.2rem; margin-bottom: 0.5rem; line-height: 1.2;">Modelo de aprendizaje profundo para la detección de los patrones de onda cerebral N1 durante los periodos de sueño.</h1>
-        <h3 style="font-weight: normal; margin-top: 0; color: #333;">Universidad Politécnica Salesiana</h3>
-        <p style="font-style: italic; font-size: 1.1rem; color: #555; margin: 0.2rem 0;">Tesis de grado</p>
+        <h1 style="font-size: 2.2rem; margin-bottom: 0.5rem; line-height: 1.2;">{c_title}</h1>
+        <h3 style="font-weight: normal; margin-top: 0; color: #333;">{c_uni}</h3>
+        <p style="font-style: italic; font-size: 1.1rem; color: #555; margin: 0.2rem 0;">{c_degree}</p>
         <div style="display: flex; justify-content: center; gap: 60px; margin: 1.5rem 0;">
             <div style="text-align: center; font-weight: bold; font-size: 1.1rem;">
-                Tutor: Ing. Jonathan Roberto Torres Castillo, PhD
+                {c_tutor} Ing. Jonathan Roberto Torres Castillo, PhD
             </div>
             <div style="text-align: center; font-weight: bold; font-size: 1.1rem;">
-                Estudiante: Nelson Daniel Hinostroza Castaño, MD
+                {c_student} Nelson Daniel Hinostroza Castaño, MD
             </div>
         </div>
         <p style="color: #666;">2026-01-08</p>
@@ -867,11 +895,14 @@ with tab_portada:
 # ==============================================================================
 with tab_env:
     st.header(t("tab_env"))
+    
+    report_file = "environment_reports.md" if LANG == 'es' else "environment_reports_en.md"
+    
     try:
-        with open("environment_reports.md", "r", encoding="utf-8") as f:
+        with open(report_file, "r", encoding="utf-8") as f:
             st.markdown(f.read())
     except FileNotFoundError:
-        st.error(f"Report file 'environment_reports.md' not found.")
+        st.error(f"Report file '{report_file}' not found.")
 
 # --- CONSTANTS ---
 TIMELINE_HTML_EN = """
