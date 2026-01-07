@@ -452,13 +452,13 @@ with st.sidebar:
     if LANG == 'es':
         c_title = "Modelo de aprendizaje profundo para la detección de los patrones de onda cerebral N1 durante los periodos de sueño."
         c_uni = "Universidad Politécnica Salesiana"
-        c_degree = "Tesis de grado"
+        c_degree = "Tesis de maestría"
         c_tutor = "Tutor:"
         c_student = "Estudiante:"
     else:
         c_title = "Deep learning model for the detection of N1 brain wave patterns during sleep periods."
         c_uni = "Salesian Polytechnic University"
-        c_degree = "Bachelor's Thesis"
+        c_degree = "Master's Thesis"
         c_tutor = "Advisor:"
         c_student = "Student:"
 
@@ -862,13 +862,13 @@ with tab_portada:
     if LANG == 'es':
         c_title = "Modelo de aprendizaje profundo para la detección de los patrones de onda cerebral N1 durante los periodos de sueño."
         c_uni = "Universidad Politécnica Salesiana"
-        c_degree = "Tesis de grado"
+        c_degree = "Tesis de maestría"
         c_tutor = "Tutor:"
         c_student = "Estudiante:"
     else:
         c_title = "Deep learning model for the detection of N1 brain wave patterns during sleep periods."
         c_uni = "Salesian Polytechnic University"
-        c_degree = "Bachelor's Thesis"
+        c_degree = "Master's Thesis"
         c_tutor = "Advisor:"
         c_student = "Student:"
 
