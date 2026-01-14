@@ -1,9 +1,21 @@
 # EEG Neural Network Checkpoint Dashboard
-![Version](https://img.shields.io/badge/version-v1.5.0-blue)
+![Version](https://img.shields.io/badge/version-v1.6.0-blue)
 
 A Streamlit-based dashboard for managing, analyzing, and running inference with PyTorch Lightning checkpoints trained on SHHS EEG data.
 
-### 🆕 v1.5.0 Changes
+### 🆕 v1.6.0 Changes
+- **Ground Truth & Validation**:
+    - **External Hypnogram Loading**: Added fallback logic to load Ground Truth from `*Hypnogram.edf` files when internal Parquet labels are missing or invalid (fixing the 30-min truncated file issue).
+    - **Confusion Matrix Labels**: Fixed `app.py` to display readable string labels (Wake, N1, N2, N3, REM) instead of integers in the confusion matrix.
+    - **CSV Resolution**: Corrected logic to prioritize exact filename matches for CSV reports, resolving data mismatches in the "Comparison" tab.
+- **Batch Processing**:
+    - **Dual-Model Inference**: Implemented batch processing using both the Baseline `2025-09-04` model and the new **Ensemble Model**.
+    - **Visualization**: Enhanced hypnogram plots (wider, better line contrast) for all batch-processed files.
+- **Project Structure**:
+    - **Clean Sync**: Removed large generated files (SQL, models) from history to ensure lightweight repository syncing.
+    - **Reports**: Restored valid pre-generated PNG reports (84MB) for instant viewing.
+
+### 📜 v1.5.0 Changes
 - **Hypnogram Precision**: Fixed Ground Truth drawing logic (z-order) to ensure true labels are always visible over predictions.
 - **UI UX Refinement**: 
     -   Split "Resumen" and "Desglose" in notebook descriptions for better readability.

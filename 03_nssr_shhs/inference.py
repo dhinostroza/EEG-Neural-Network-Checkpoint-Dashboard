@@ -16,7 +16,8 @@ try:
     from scipy import signal
     from skimage.transform import resize
     HAS_EDF_LIBS = True
-except ImportError:
+except ImportError as e:
+    print(f"Warning: Optional libraries for EDF conversion not found: {e}")
     HAS_EDF_LIBS = False
 
 # ==============================================================================

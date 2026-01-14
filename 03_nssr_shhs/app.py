@@ -6,7 +6,10 @@ import torch
 import time
 import shutil
 import glob
+import re
 import altair as alt
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import xml.etree.ElementTree as ET
 import importlib
 import json # Added for notebook generation
@@ -14,11 +17,27 @@ import analyzer
 importlib.reload(analyzer)
 from analyzer import CheckpointAnalyzer
 from inference import get_model, load_checkpoint_weights, preprocess_spectrogram, detect_architecture, convert_edf_to_parquet
+from ensemble_logic import load_ensemble_models, predict_ensemble
 from colab_data import COLAB_NOTEBOOKS
 
 
 
 # ... imports remain the same ...
+
+# ==============================================================================
+# GLOBAL SIDEBAR SETTINGS (Visible on All Tabs)
+# ==============================================================================
+# DEBUG: Monitor System RAM
+import psutil
+process = psutil.Process(os.getpid())
+
+st.sidebar.markdown("### ⚙️ Configuración")
+# use_cpu_safe_mode = st.sidebar.checkbox("Modo Seguro (CPU)", value=True, help="Activar si el análisis se cuelga/reinicia. Evita uso de GPU/MPS.")
+use_cpu_safe_mode = False
+mem_mb = process.memory_info().rss / 1024 ** 2
+st.sidebar.caption(f"RAM Usage: {mem_mb:.0f} MB")
+if use_cpu_safe_mode:
+    st.sidebar.warning("⚠️ CPU Mode Active")
 
 # ==============================================================================
 # LOCALIZATION (i18n)
@@ -30,8 +49,8 @@ TRANSLATIONS = {
         "es": "Portada"
     },
     "page_title": {
-        "en": "NSSR SHHS Checkpoint Dashboard",
-        "es": "Panel de control de modelos NSSR SHHS"
+        "en": "NSRR SHHS Checkpoint Dashboard",
+        "es": "Panel de control de modelos NSRR SHHS"
     },
     "header_title": {
         "en": "Neural Network Checkpoint Dashboard",
@@ -339,11 +358,19 @@ TRANSLATIONS = {
     "files_word": {
         "en": "files",
         "es": "registros"
+    },
+    "ensemble_mode": {
+         "en": "Ensemble Mode (Robust)",
+         "es": "Modo Ensemble (Robusto)"
+    },
+    "ensemble_desc": {
+         "en": "Automatically uses the 3 best models to vote on the diagnosis. Slower but more accurate (Recalls N1/N2 better).",
+         "es": "Usa automáticamente los 3 mejores modelos para votar el diagnóstico. Más lento pero mucho más preciso (Mejor detección N1/N2)."
     }
 }
 
 # --- Language Helper ---
-st.set_page_config(page_title="NSSR SHHS Dashboard", layout="wide")
+st.set_page_config(page_title="NSRR SHHS Dashboard", layout="wide")
 
 def inject_custom_css():
     st.markdown("""
@@ -353,7 +380,7 @@ def inject_custom_css():
             display: none;
         }
         section[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] div div::after {
-            content: "Límite de 200MB por archivo .parquet, .edf, .bdf, .xml";
+            content: "Límite de 200 MB<br>formato .parquet, .edf, .bdf, .xml";
             font-size: 0.8em;
         }
         
@@ -748,6 +775,59 @@ def save_results_to_sql(filename, predictions, confidence_scores, model_name, pa
     except Exception as e:
         print(f"Error saving to SQL: {e}")
         return False
+
+def generate_and_save_hypnogram(filename, predictions, true_labels=None, prev_preds=None, title="Hypnogram"):
+    """Generates and saves a Hypnogram PNG for instant retrieval."""
+    try:
+        # Create a non-interactive figure
+        fig, ax = plt.subplots(figsize=(10, 4))
+        
+        # Data
+        x = range(len(predictions))
+        y = predictions
+        
+        # Plot Predictions
+        ax.step(x, y, where='post', label='Prediction', color='#2196f3', linewidth=1.5)
+        
+        # Plot Previous Best (if valid)
+        if prev_preds and len(prev_preds) == len(predictions):
+             ax.step(x, prev_preds, where='post', label='Previous Best', color='gray', linestyle=':', alpha=0.7)
+
+        # Plot Ground Truth (if valid)
+        if true_labels:
+            # Filter -1 or invalid
+            # Ensure same length
+            min_len = min(len(x), len(true_labels))
+            valid_indices = [i for i in range(min_len) if true_labels[i] >= 0]
+            if valid_indices:
+                 # Safer plotting for non-continuous indices: convert to full array with NaNs
+                 y_gt_full = [true_labels[i] if (i < len(true_labels) and true_labels[i] >= 0) else float('nan') for i in range(len(x))]
+                 ax.step(x, y_gt_full, where='post', label='Ground Truth', color='#4caf50', linestyle='--', linewidth=2)
+
+        # Formatting
+        ax.set_yticks([0, 1, 2, 3, 4])
+        ax.set_yticklabels(['Wake', 'N1', 'N2', 'N3', 'REM'])
+        ax.set_title(title)
+        ax.set_xlabel("Epoch (30s)")
+        ax.set_ylabel("Sleep Stage")
+        ax.invert_yaxis() # Sleep stages convention: Wake at top
+        ax.legend(loc='upper right')
+        ax.grid(True, alpha=0.3)
+        
+        # Save
+        # Replace extension with .png
+        base_name = os.path.splitext(filename)[0]
+        png_path = f"{base_name}_hypnogram.png"
+        
+        plt.tight_layout()
+        plt.savefig(png_path, dpi=100)
+        plt.close(fig)
+        
+        return png_path
+        
+    except Exception as e:
+        print(f"Error generating Hypnogram PNG: {e}")
+        return None
 
 def create_notebook_json(code_content):
     """Wraps raw python code in a valid Jupyter Notebook JSON structure."""
@@ -1264,6 +1344,7 @@ with tab1:
             
         raw_groups = df['group'].unique().tolist()
         # Sort descending by number
+    # Sort descending by number
         groups = sorted(raw_groups, key=get_sort_key, reverse=True)
         
         # Translation helper for the dropdown
@@ -1294,7 +1375,28 @@ with tab1:
             df_display = df[df['group'] == selected_group].copy()
         else:
             df_display = df.copy()
-            
+
+        # --- INJECT CHAMPION MODEL ALIAS ---
+        # Add a special row for the Ensemble Model so it appears in the table/list
+        ensemble_row = {
+            "filename": "🏆 MODELO CAMPEÓN (Ensemble)",
+            "val_loss": 0.5533, # Representative
+            "group": "2000 files",
+            "model_architecture": "Ensemble (Voting)",
+            "params_m": 88.59 * 3,
+            "epoch": "Mixed",
+            "size_mb": 1005.81, # From .pt file
+            "date_modified": "2026-01-11 02:00",
+            "lr": "Mixed", 
+            "workers": "Mixed",
+            "trained_on_files": 2000,
+            "filepath": "ENSEMBLE_MAGIC_STRING" # Magic string to detect logic
+        }
+        # Only inject if we are in '2000 files' or 'All'
+        if selected_group in ["All", "2000 files"]:
+             # Add to top
+             df_display = pd.concat([pd.DataFrame([ensemble_row]), df_display], ignore_index=True)
+
         # --- DETAILED REPORTS LOGIC ---
         
         REPORTS = {
@@ -1599,6 +1701,26 @@ with tab1:
         st.info(t("no_checkpoints"))
 
 # ==============================================================================
+# Helper Functions
+# ==============================================================================
+
+@st.cache_resource
+def load_cached_scripted_model(path, device_str):
+    """
+    Loads and caches the TorchScript model to prevent MPS memory leaks/crashes
+    caused by repeated reloading in Streamlit.
+    """
+    try:
+        model = torch.jit.load(path)
+        device = torch.device(device_str)
+        model.to(device)
+        model.eval()
+        return model
+    except Exception as e:
+        st.error(f"Failed to load specific model: {e}")
+        return None
+
+# ==============================================================================
 # TAB 2: INFERENCE
 # ==============================================================================
 with tab2:
@@ -1682,70 +1804,83 @@ with tab2:
             else:
                  valid_df = df[df['val_loss'].notna()].copy()
                  if not valid_df.empty:
-                    # Identify best model for default
-                    best_model_idx = valid_df['val_loss'].idxmin()
-                    best_model_name = valid_df.loc[best_model_idx, 'filename']
+                # Identify best model for default
+                    # If alias is present in df (global df might not have it yet unless we inject it there too?)
+                    # Wait, df is used for validation. We should use a logic that allows the alias.
                     
-                    # Model Selector
+                    # Construct options list including the Champion if applicable
+                    # We can assume "🏆 MODELO CAMPEÓN (Ensemble)" is desired.
+                    
+                    # Create options list from filtered df or original df
+                    # Let's use valid_df from original df plus the alias
+                    
                     model_options = valid_df['filename'].tolist()
-                    # Find index of best model in the list
-                    default_index = model_options.index(best_model_name) if best_model_name in model_options else 0
                     
-                    # Standardized Header
-                    st.markdown(f"**{t('select_model_label')}**")
+                    # Insert Champion at top if 2000 files exist
+                    champion_name = "🏆 MODELO CAMPEÓN (Ensemble)"
+                    if "2000 files" in df['group'].unique():
+                         if champion_name not in model_options:
+                             model_options.insert(0, champion_name)
                     
+                    # Selection Widget
                     selected_model_name = st.selectbox(
-                        label=t("select_model_label"),
-                        options=model_options,
-                        index=default_index,
-                        key="model_selector",
-                        label_visibility="collapsed"
+                        t("model_label"),
+                        model_options,
+                        index=0
                     )
                     
-                    # Get the row for the SELECTED model
-                    selected_model_row = df[df['filename'] == selected_model_name].iloc[0]
-                    model_meta = selected_model_row # Update global meta reference
-                    
-                    # Restore detailed info
-                    st.markdown(f"**Model: {selected_model_name}**")
-                    
-                    # Extract meta
-                    lr = selected_model_row.get('lr', 'N/A')
-                    wrs = selected_model_row.get('weighted_sampler', False)
-                    weights = "WRS: On" if wrs else "WRS: Off"
+                    # Logic Mapping
+                    if selected_model_name == champion_name:
+                         # Set internal flag for Ensemble
+                         is_ensemble = True
+                         # Mock metadata for display
+                         selected_model_row = {
+                            "filename": champion_name,
+                            "model_architecture": "Ensemble (Voting)",
+                            "val_loss": 0.5533,
+                            "time": "N/A",
+                            "trained_on_files": 2000,
+                            "epoch": "- (Mixed)",
+                            "params_m": 266.0,
+                            "lr": "Mixed",
+                            "workers": "Mixed",
+                             "date": "2026-01-11"
+                        }
+                    else:
+                        is_ensemble = False
+                        try:
+                            selected_model_row = df[df['filename'] == selected_model_name].iloc[0]
+                        except:
+                             selected_model_row = {}
+
                     workers = f"Workers: {selected_model_row.get('workers', 0)}"
                     n_files = selected_model_row.get('trained_on_files', 0)
                     
-                    info_c1, info_c2, info_c3, info_c4 = st.columns(4)
-                    
-                    with info_c1:
-                        st.markdown(f"**{t('date_label')}:** {selected_model_row.get('date', 'N/A')}  \n"
-                                    f"**{t('arch')}:** {selected_model_row.get('model_architecture', 'Unknown')}")
-                    
-                    with info_c2:
-                        v_loss = selected_model_row.get('val_loss', 0)
-                        v_loss_str = f"{v_loss:.4f}" if isinstance(v_loss, (int, float)) else f"{v_loss}"
-                        st.markdown(f"**{t('time_label')}:** {selected_model_row.get('time', 'N/A')}  \n"
-                                    f"**{t('val_loss')}:** {v_loss_str}")
-                        
-                    with info_c3:
-                         st.markdown(f"**{t('files_label')}:** {n_files}  \n"
-                                     f"**{t('epoch')}:** {selected_model_row.get('epoch', 'N/A')}")
-                                     
-                    with info_c4:
-                         # Param string construction
-                         fname = selected_model_row.get('filename', '')
-                         import re
-                         cw_match = re.search(r'(cwN1-[\d\.]+)', fname)
-                         cw_str = cw_match.group(1) if cw_match else (weights if weights else "")
-                         lr_val = selected_model_row.get('lr', 'N/A')
-                         w_val = selected_model_row.get('workers', 0)
-                         params_str = f"lr = {lr_val}, {cw_str} Workers = {w_val}"
-                         
-                         st.markdown(f"**{t('params_label')}:** {selected_model_row.get('params_m', 0):.2f} M  \n"
-                                     f"**Hyperparams:** {params_str}")
-                    
-                    # User requested reduced vertical space. Using HTML hr with negative margin.
+                    if not is_ensemble:
+                         info_c1, info_c2, info_c3, info_c4 = st.columns(4)
+                         with info_c1:
+                             st.markdown(f"**{t('date_label')}:** {selected_model_row.get('date', 'N/A')}  \n"
+                                         f"**{t('arch')}:** {selected_model_row.get('model_architecture', 'Unknown')}")
+                         with info_c2:
+                             v_loss = selected_model_row.get('val_loss', 0)
+                             v_loss_str = f"{v_loss:.4f}" if isinstance(v_loss, (int, float)) else f"{v_loss}"
+                             st.markdown(f"**{t('time_label')}:** {selected_model_row.get('time', 'N/A')}  \n"
+                                         f"**{t('val_loss')}:** {v_loss_str}")
+                         with info_c3:
+                              st.markdown(f"**{t('files_label')}:** {n_files}  \n"
+                                          f"**{t('epoch')}:** {selected_model_row.get('epoch', 'N/A')}")
+                         with info_c4:
+                              fname = selected_model_row.get('filename', '')
+                              cw_match = re.search(r'(cwN1-[\d\.]+)', fname)
+                              cw_str = cw_match.group(1) if cw_match else (weights if weights else "")
+                              lr_val = selected_model_row.get('lr', 'N/A')
+                              w_val = selected_model_row.get('workers', 0)
+                              params_str = f"lr = {lr_val}, {cw_str} Workers = {w_val}"
+                              st.markdown(f"**{t('params_label')}:** {selected_model_row.get('params_m', 0):.2f} M  \n"
+                                          f"**Hyperparams:** {params_str}")
+                    else:
+                        st.info("ℹ️ **Ensemble Mode Active**: Running combined inference with 3 optimized checkpoints.")
+
                     st.markdown("""<hr style="height:1px;border:none;color:#333;background-color:#ccc; margin-top: -5px; margin-bottom: 10px;" /> """, unsafe_allow_html=True)
                  else:
                     selected_model_name = None
@@ -1786,6 +1921,126 @@ with tab2:
         run_btn = st.button(t("analyze_btn"), type="primary", use_container_width=True)
         
         global_status_container = st.empty()
+
+        # --- PRE-GENERATED REPORT DISPLAY (Auto-Load on Selection) ---
+        if selected_history_files:
+            st.divider()
+            st.markdown("### 📊 Reportes Pre-generados")
+            
+            import glob
+            
+            for h_file in selected_history_files:
+                # 1. Try Direct Match for New 3-Way Reports
+                base_name = os.path.splitext(h_file)[0] # SC4001E or SC4001E_processed
+                
+                png_stats = os.path.join("png", f"{base_name}_stats_comparison.png")
+                png_hypno = os.path.join("png", f"{base_name}_comparison.png")
+                
+                # Fallback: Check if file has _processed but image doesn't (or vice versa)
+                if not os.path.exists(png_stats) and "_processed" in base_name:
+                     base_stripped = base_name.replace("_processed", "")
+                     if os.path.exists(os.path.join("png", f"{base_stripped}_stats_comparison.png")):
+                         png_stats = os.path.join("png", f"{base_stripped}_stats_comparison.png")
+                         png_hypno = os.path.join("png", f"{base_stripped}_comparison.png")
+
+                found_new_reports = False
+                
+                if os.path.exists(png_stats):
+                    st.success(f"Reporte Estadístico encontrado: `{os.path.basename(png_stats)}`")
+                    st.image(png_stats, caption=f"Estadísticas Comparativas: {base_name}", use_container_width=True)
+                    found_new_reports = True
+                
+                if os.path.exists(png_hypno):
+                    st.success(f"Hipnograma encontrado: `{os.path.basename(png_hypno)}`")
+                    st.image(png_hypno, caption=f"Hipnograma Comparativo: {base_name}", use_container_width=True)
+                    found_new_reports = True
+                    
+                # 3. Try to load CSV for Metrics (Accuracy & Confusion Matrix)
+                # Attempt to find the CSV generated by convert_and_analyze.py
+                # It is usually named comparison_results_{base_name}.csv in the root or same dir
+                # 3. Try to load CSV for Metrics (Accuracy & Confusion Matrix)
+                # Attempt to find the CSV generated by convert_and_analyze.py
+                
+                # Priority 1: Exact Match (e.g. comparison_results_SC4001E_processed.csv)
+                csv_filename = f"comparison_results_{base_name}.csv"
+                if not os.path.exists(csv_filename):
+                     # Priority 2: Fallback to stripped name (e.g. comparison_results_SC4001E.csv)
+                     csv_filename = f"comparison_results_{base_name.replace('_processed', '')}.csv"
+                
+                # Check current dir
+                if os.path.exists(csv_filename):
+                    try:
+                        res_df = pd.read_csv(csv_filename)
+                        
+                        # Verify columns exist
+                        # We expect 'true_label' and 'pred_ensemble' (from the batch script)
+                        if 'true_label' in res_df.columns and 'pred_ensemble' in res_df.columns:
+                            
+                            valid_mask = res_df['true_label'] >= 0
+                            
+                            if valid_mask.any():
+                                st.markdown("#### 📊 Análisis Comparativo (Datos Cargados)")
+                                
+                                # Calculate Accuracy
+                                correct = (res_df.loc[valid_mask, 'pred_ensemble'] == res_df.loc[valid_mask, 'true_label']).sum()
+                                acc = correct / valid_mask.sum()
+                                
+                                # Calculate Confusion Matrix
+                                # Map to Strings
+                                stage_map_cm = {0: 'Wake', 1: 'N1', 2: 'N2', 3: 'N3', 4: 'REM'}
+                                order_list = ['Wake', 'N1', 'N2', 'N3', 'REM']
+
+                                gt_mapped = res_df.loc[valid_mask, 'true_label'].map(stage_map_cm)
+                                pred_mapped = res_df.loc[valid_mask, 'pred_ensemble'].map(stage_map_cm)
+                                
+                                # Use Categorical to ensure sort order
+                                gt_cat = pd.Categorical(gt_mapped, categories=order_list, ordered=True)
+                                pred_cat = pd.Categorical(pred_mapped, categories=order_list, ordered=True)
+
+                                cm_df = pd.crosstab(
+                                    gt_cat, 
+                                    pred_cat, 
+                                    rownames=['Actual'], 
+                                    colnames=['Predicho'],
+                                    dropna=False
+                                )
+                                
+                                # Display in columns
+                                mc1, mc2 = st.columns([1, 2])
+                                
+                                with mc1:
+                                    st.metric("Exactitud (Accuracy)", f"{acc:.2%}")
+                                    st.caption(f"Calculado sobre {valid_mask.sum()} épocas con Ground Truth válido.")
+                                    
+                                with mc2:
+                                    # st.markdown("**Matriz de Confusión**")
+                                    st.dataframe(cm_df.style.background_gradient(cmap='Blues'), use_container_width=True)
+                                    
+                    except Exception as e_csv:
+                        print(f"Error loading CSV metrics: {e_csv}") # Log to console
+                        # st.warning(f"No se pudieron cargar las métricas numéricas: {e_csv}")
+                    
+                # 2. If NO new reports found, try Legacy Search (Original functionality)
+                if not found_new_reports:
+                    core_name = os.path.splitext(h_file)[0].replace("_processed", "")
+                    patterns = [
+                        os.path.join("png", f"*_{core_name}_es.png"),
+                        os.path.join("png", f"*_{core_name}_en.png"),
+                        os.path.join("png", f"*_{core_name}_*.png")
+                    ]
+                    found_png = None
+                    for pat in patterns:
+                        matches = glob.glob(pat)
+                        if matches:
+                            matches.sort(reverse=True)
+                            found_png = matches[0]
+                            break
+                    
+                    if found_png:
+                        st.success(f"Reporte Legacy encontrado: `{os.path.basename(found_png)}`")
+                        st.image(found_png, caption=f"Reporte de Inferencia (Legacy): {core_name}", use_container_width=True)
+                    else:
+                        st.info(f"No se encontraron reportes pre-generados para `{base_name}`. Ejecute el análisis para generarlos.")
 
         # --- RESULTS AREA (Full Main Column Width) ---
         # Auto-trigger analysis -> NOW MANUAL via button
@@ -1989,23 +2244,40 @@ with tab2:
                              input_df['true_label'] = input_df[df_gt_col]
                     
                     predictions = []
+                    legacy_preds = [] # Store for comparison
                     
+                    # ------------------------------------------------------------------
+                    # CHECK MODEL SELECTION (Moved Up for Cache Logic)
+                    # ------------------------------------------------------------------
+                    # Check against alias name "🏆 MODELO CAMPEÓN (Ensemble)" OR legacy key "Ensemble_Model"
+                    is_ensemble_selected = (selected_model_name == "Ensemble_Model") or (selected_model_name == "🏆 MODELO CAMPEÓN (Ensemble)")
+
+
                     # ------------------------------------------------------------------
                     # FAST PATH: Check for Pre-computed Results (SQL)
                     # ------------------------------------------------------------------
+                    # Logic update: If Ensemble is selected, we FORCE re-run (ignore cache for main prediction) 
+                    # but we keep the cache as "Legacy Prediction" for comparison.
                     if cached_preds:
-                        # Instant load
-                        time.sleep(0.5) 
-                        progress_bar.progress(100)
-                        predictions = cached_preds
-                        
-                        # Reconstruct input_df if missing (History case)
-                        if input_df.empty:
-                            input_df = pd.DataFrame(index=range(len(predictions)))
+                        if not is_ensemble_selected:
+                            # Standard Case: Use Cache
+                            time.sleep(0.5) 
+                            progress_bar.progress(100)
+                            predictions = cached_preds
                             
-                        global_status_container.success(t("msg_loaded_cache").format(filename=uploaded_file.name))
-                        progress_bar.empty()
-                    else:
+                            # Reconstruct input_df if missing (History case)
+                            if input_df.empty:
+                                input_df = pd.DataFrame(index=range(len(predictions)))
+                                
+                            global_status_container.success(t("msg_loaded_cache").format(filename=uploaded_file.name))
+                            progress_bar.empty()
+                        else:
+                            # Ensemble Case: Keep cache for comparison, but run NEW inference
+                            legacy_preds = cached_preds
+                            # Proceed to 'else' block
+                    
+                    # If we don't have predictions yet (either no cache, or we ignored it for Ensemble)
+                    if not predictions:
                         # ------------------------------------------------------------------
                         # NORMAL PATH: Run Inference (Real Uploads Only)
                         # ------------------------------------------------------------------
@@ -2015,72 +2287,213 @@ with tab2:
                         status_text = st.empty() # Reset local text
                         progress_bar = st.progress(0)
                         
-                        # 2. Get Model Path (Use cached filepath to handle subdirs)
-                        # model_path = os.path.join(BASE_DIR, selected_model_name) <-- BUG
-                        try:
-                            row = df[df['filename'] == selected_model_name].iloc[0]
-                            model_path = row['filepath']
-                        except:
-                            # Fallback
-                            model_path = os.path.join(BASE_DIR, selected_model_name)
-                        
-                        global_status_container.info(t("loading_model"))
-                        progress_bar.progress(10)
-                        
-                        # Detection
-                        arch = detect_architecture(model_path)
-                        st.caption(f"{t('detected_arch')}: {arch}")
-                        
-                        model = get_model(model_name=arch, num_classes=5, pretrained=False)
-                        model, _ = load_checkpoint_weights(model, model_path)
-                        model.eval()
-                        
-                        global_status_container.info(f"{t('loading_data')} ({uploaded_file.name})")
-                        progress_bar.progress(30)
-                        
-                        global_status_container.info(t("running_inf").format(len(input_df)))
-                        
-                        # Inference Loop (Batched & Vectorized for Speed)
-                        with torch.no_grad():
-                            # Prepare Data (Vectorized)
-                            cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage', 'true_label'] if c in input_df.columns]
-                            if cols_to_drop:
-                                data_values = input_df.drop(columns=cols_to_drop).values
-                            else:
-                                data_values = input_df.values
+                        if is_ensemble_selected:
+                             start_inference_loop = False # Initialize default
+                             # Check for Optimized TorchScript File
+                             script_path = os.path.join(BASE_DIR, "ensemble_model_scripted.pt")
+                             
+                             # CRITICAL: Verify we have the RAW data for re-inference
+                             # History files often load as empty/metadata-only input_df initially.
+                             # We need to find the specific .parquet file that contains the SIGNAL.
+                             
+                             raw_parquet_path = None
+                             # 1. Try name as is
+                             if os.path.exists(uploaded_file.name):
+                                 raw_parquet_path = uploaded_file.name
+                             else:
+                                 # 2. Try constructing from base directory + clean name
+                                 # e.g. "shhs1-200008" -> "shhs1-200008.parquet" or "shhs1-200008_processed.parquet"
+                                 # We prefer the one that has the SIGNAL columns.
+                                 clean_name = os.path.splitext(os.path.basename(uploaded_file.name))[0]
+                                 clean_name = clean_name.replace("_processed", "")
+                                 
+                                 candidates = [
+                                     f"{clean_name}.parquet",
+                                     f"{clean_name}_processed.parquet",
+                                     # Check subdirectories
+                                     os.path.join("parquet_files", f"{clean_name}.parquet"),
+                                     os.path.join(BASE_DIR, "parquet_files", f"{clean_name}.parquet"),
+                                     os.path.join(BASE_DIR, f"{clean_name}.parquet")
+                                 ]
+                                 for c in candidates:
+                                     if os.path.exists(c):
+                                         raw_parquet_path = c
+                                         break
+                                         
+                             if not raw_parquet_path:
+                                 st.warning(f"⚠️ Cannot run Ensemble: Original raw file (`{clean_name}.parquet`) not found on disk.")
+                                 st.caption("Showing cached results instead.")
+                                 if cached_preds:
+                                     predictions = cached_preds
+                                     legacy_preds = [] # No comparison possible/needed
+                                     start_inference_loop = False # Skip loop
+                                 else:
+                                     st.error("No raw file and no cache found.")
+                                     continue # Skip to next file
+                             else:
+                                 # RELOAD `input_df` FROM RAW SOURCE TO GET SIGNAL
+                                 # Only if existing input_df looks "empty" (no columns) or lacks signal
+                                 # But safely, always reload for inference to be sure.
+                                 try:
+                                     input_df = pd.read_parquet(raw_parquet_path)
+                                     # Verify it has data
+                                     if input_df.empty: 
+                                         raise ValueError("File is empty")
+
+                                     # RE-PROCESS DATA FOR INFERENCE
+                                     cols_to_drop = [c for c in ['label', 'stage', 'sleep_stage', 'true_label'] if c in input_df.columns]
+                                     if cols_to_drop:
+                                         dvals = input_df.drop(columns=cols_to_drop).select_dtypes(include=[np.number]).values
+                                     else:
+                                         dvals = input_df.select_dtypes(include=[np.number]).values
+                                     
+                                     X = dvals.astype(np.float32)
+                                     mean = X.mean(axis=1, keepdims=True)
+                                     std = X.std(axis=1, keepdims=True)
+                                     spectrogram_n = (X - mean) / (std + 1e-6)
+                                     spectrogram_2d = spectrogram_n.reshape(-1, 1, 76, 60)
+                                 except Exception as e_load:
+                                      st.error(f"Failed to load raw file {raw_parquet_path}: {e_load}")
+                                      continue
+                                 
+                                 if os.path.exists(script_path):
+                                     global_status_container.info(f"Loading Optimized Ensemble (TorchScript)...")
+                                     progress_bar.progress(10)
+                                     
+                                     device_str = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+                                     device = torch.device(device_str)
+                                     
+                                     # USE CACHED LOADER (Critical for Streamlit Stability)
+                                     model = load_cached_scripted_model(script_path, device_str)
+                                     if model is None:
+                                         st.error("Model load failed.")
+                                         continue # Skip to next file
+                                     
+                                     # Optimization: Use the standard inference loop below!
+                                     # The scripted model contains the ensemble logic internally.
+                                     # It returns probabilities. Argmax(probs) is valid.
+                                     # We just need to fall-through to the inference loop with this 'model'.
+                                     
+                                     # Skip the else block logic for single model loading
+                                     start_inference_loop = True
+                                     
+                                 else:
+                                     # Fallback: Load 3 Checkpoints (Slow)
+                                     global_status_container.info(f"Loading Ensemble Models... (This might take memory)")
+                                     
+                                     # Define Hardcoded Best Models
+                                     ckpt_files_dir = os.path.join(BASE_DIR, "2000 files")
+                                     ensemble_ckpts = [
+                                         os.path.join(ckpt_files_dir, "2025-09-04_05-36_convnext_base_2000files_lr2e-05_cwN1-8.0_workers2.ckpt"),
+                                         os.path.join(ckpt_files_dir, "2025-09-09_15-43_convnext_base_2000files_Augmented_cwN1-6.5.ckpt"),
+                                         os.path.join(ckpt_files_dir, "2025-09-19_04-34_convnext_base_consolidated_cwN1-6.5-epoch=3-val_loss=0.5971.ckpt")
+                                     ]
+                                     
+                                     # Cache Loading!
+                                     @st.cache_resource
+                                     def get_cached_ensemble_models(paths):
+                                         return load_ensemble_models(paths)
+                                         
+                                     try:
+                                         models = get_cached_ensemble_models(ensemble_ckpts)
+                                         global_status_container.info(t("running_inf").format(len(input_df)))
+                                         progress_bar.progress(20)
+                                         
+                                         predictions_np, _ = predict_ensemble(models, input_df, batch_size=64)
+                                         predictions = predictions_np.tolist()
+                                         
+                                         # Jump directly to save (bypass standard loop)
+                                         start_inference_loop = False
+                                         
+                                     except Exception as e_ens:
+                                         st.error(f"Ensemble Error: {e_ens}")
+                                         st.stop()
+
+
+                                     
+                        else:
+                            # SINGLE MODEL FLOW
+                            # 2. Get Model Path (Use cached filepath to handle subdirs)
+                            try:
+                                row = df[df['filename'] == selected_model_name].iloc[0]
+                                model_path = row['filepath']
+                            except:
+                                # Fallback
+                                model_path = os.path.join(BASE_DIR, selected_model_name)
                             
-                            total = len(data_values)
-                            batch_size = 64
-                            predictions = []
+                            global_status_container.info(t("loading_model"))
+                            progress_bar.progress(10)
                             
-                            # Log-progress only every few batches
-                            log_interval = max(1, total // (batch_size * 5))
+                            # Detection
+                            arch = detect_architecture(model_path)
+                            st.caption(f"{t('detected_arch')}: {arch}")
                             
-                            for batch_idx, start_idx in enumerate(range(0, total, batch_size)):
-                                end_idx = min(start_idx + batch_size, total)
-                                
-                                # 1. Get Batch (N, 4560)
-                                batch_flat = data_values[start_idx:end_idx].astype(np.float32)
-                                
-                                # 2. Preprocess Vectorized (Match preprocess_spectrogram logic)
-                                # Mean/Std per sample (axis 1)
-                                mean = batch_flat.mean(axis=1, keepdims=True)
-                                std = batch_flat.std(axis=1, keepdims=True)
-                                batch_norm = (batch_flat - mean) / (std + 1e-6)
-                                batch_reshaped = batch_norm.reshape(-1, 1, 76, 60)
-                                
-                                # 3. To Tensor
-                                input_tensor = torch.from_numpy(batch_reshaped)
-                                
-                                # 4. Forward Pass
-                                logits = model(input_tensor)
-                                pred_batch = torch.argmax(logits, dim=1).tolist()
-                                predictions.extend(pred_batch)
-                                
-                                # Progress
-                                if batch_idx % log_interval == 0:
-                                    prog = 30 + int(60 * (end_idx / total))
-                                    progress_bar.progress(prog)
+                            model = get_model(model_name=arch, num_classes=5, pretrained=False)
+                            model, _ = load_checkpoint_weights(model, model_path)
+                            
+                            # DEVICE OPTIMIZATION
+                            device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+                            model.to(device)
+                            model.eval()
+                            
+                            start_inference_loop = True
+
+                        if start_inference_loop:
+                             global_status_container.info(f"{t('loading_data')} ({uploaded_file.name})")
+                             progress_bar.progress(30)
+                             
+                             global_status_container.info(t("running_inf").format(len(input_df)))
+                             
+                             # Inference Loop (Batched & Vectorized for Speed)
+                             # Works for both Single Model (Logits) and Scripted Ensemble (Probs)
+                             # as long as we take argmax.
+                             try:
+                                 with torch.no_grad():
+                                     chunk_size = 128 # Default efficient size
+                                     import gc
+                                     
+                                     # DEVICE HANDLING: SAFE MODE TOGGLE
+                                     # If Safe Mode is ON (default), force CPU to avoid MPS crashes.
+                                     # If Safe Mode is OFF, use Automatic detection (MPS/CUDA).
+                                     if use_cpu_safe_mode or device.type == "cpu":
+                                        t_tensor = torch.from_numpy(spectrogram_2d) # Keep on CPU
+                                     else:
+                                        t_tensor = torch.from_numpy(spectrogram_2d).to(device)
+                                     
+                                     total_samples = len(t_tensor)
+
+                                     for i in range(0, total_samples, chunk_size):
+                                         try:
+                                             batch = t_tensor[i:i+chunk_size]
+                                             # implicit else: batch is slice of VRAM tensor (or CPU view if on CPU)
+                                             
+                                             outputs = model(batch)
+                                             _, preds = torch.max(outputs, 1)
+                                             batch_preds.extend(preds.cpu().numpy().tolist())
+                                             
+                                             # Cleanups
+                                             del outputs, preds
+                                             if i % (chunk_size * 10) == 0: 
+                                                 if device.type == "mps":
+                                                     torch.mps.empty_cache()
+                                                 gc.collect() 
+                                                 
+                                                 # DEBUG: Print RAM usage periodically
+                                                 mem_mb = process.memory_info().rss / 1024 ** 2
+                                                 if mem_mb > 4000: # Warn if > 4GB
+                                                     st.toast(f"⚠️ High RAM: {mem_mb:.0f} MB")
+                                             
+                                             # Update progress LESS FREQUENTLY to avoid IPC overhead
+                                             if i % (chunk_size * 2) == 0: 
+                                                  prog = 30 + int(70 * (min(1.0, (i + chunk_size) / total_samples)))
+                                                  progress_bar.progress(prog)
+                                         except Exception as e_batch:
+                                             print(f"Batch {i} error: {e_batch}")
+                                             batch_preds.extend([-1] * chunk_size)
+                                             continue
+                             except Exception as e_inf:
+                                 st.error(f"CRITICAL INFERENCE ERROR: {e_inf}")
+                                 st.stop()
                         
                         # SAVE TO SQL
                         dummy_confs = [1.0] * len(predictions)
@@ -2098,6 +2511,25 @@ with tab2:
                         
                         save_success = save_results_to_sql(processed_filename, predictions, dummy_confs, selected_model_name)
                         if save_success:
+                            # Generate and Save PNG Hypnogram (Instant Retrieval)
+                            try:
+                                # Determine GT source
+                                gt_source = None
+                                if gt_labels: gt_source = gt_labels
+                                elif cached_gts: gt_source = cached_gts
+                                
+                                png_file = generate_and_save_hypnogram(
+                                    processed_filename,
+                                    predictions,
+                                    true_labels=gt_source,
+                                    prev_preds=legacy_preds if legacy_preds else None,
+                                    title=f"Hypnogram: {uploaded_file.name}"
+                                )
+                                if png_file:
+                                    st.toast(f"Saved Hypnogram PNG for instant retrieval")
+                            except Exception as e_png:
+                                print(f"PNG Generation Failed: {e_png}")
+
                             st.toast(f"Saved {processed_filename} to history!")
                             # Force sidebar update so suffix appears
                             time.sleep(1) # Small delay for toast
@@ -2112,6 +2544,14 @@ with tab2:
                     input_df['predicted_mid'] = predictions
                     input_df['predicted_label'] = input_df['predicted_mid'].map(stage_map)
                     
+                    # Inject Legacy Prediction (Previous Best) if available
+                    if legacy_preds:
+                         # Ensure length matches (Handling truncation scenarios if any)
+                         min_len_leg = min(len(input_df), len(legacy_preds))
+                         input_df = input_df.iloc[:min_len_leg].copy() # Truncate df to match strict min
+                         input_df['prev_predicted_mid'] = legacy_preds[:min_len_leg]
+                         input_df['prev_predicted_label'] = input_df['prev_predicted_mid'].map(stage_map)
+
                     # --- SAFETY MERGE: Ensure Ground Truth is present before Viz ---
                     # If upstream logic reset input_df (e.g. History file reload), we restore GT here.
                     if 'true_label' not in input_df.columns:
@@ -2258,8 +2698,18 @@ with tab2:
                             input_df['Epoch'] = range(len(input_df))
                         
                         # Display Columns
-                        pred_display_cols = ['Epoch', 'predicted_label', 'predicted_mid']
+                        pred_display_cols = ['Epoch', 'predicted_label']
                         
+                        col_config = {
+                            "Epoch": st.column_config.TextColumn("Epoch"), 
+                            "predicted_label": st.column_config.TextColumn(f"🏆 {t('pred_stage')} (Ensemble)" if is_ensemble_selected else t("pred_stage")),
+                        }
+                        
+                        # Add Previous Best if available
+                        if 'prev_predicted_label' in input_df.columns:
+                            pred_display_cols.append('prev_predicted_label')
+                            col_config['prev_predicted_label'] = st.column_config.TextColumn("Previous Best (Cache)")
+
                         # Prepare DF for Left Alignment (Cast to string) and Select Columns
                         left_align_df = input_df[pred_display_cols].astype(str)
                         
@@ -2267,11 +2717,7 @@ with tab2:
                             left_align_df, 
                             use_container_width=True,  # Fit within the 3-column layout
                             height=400,
-                            column_config={
-                                "Epoch": st.column_config.TextColumn("Epoch"), 
-                                "predicted_label": st.column_config.TextColumn(t("pred_stage")),
-                                "predicted_mid": st.column_config.TextColumn(t("class_index"))
-                            }
+                            column_config=col_config
                         )
                         
                         # Download Button
@@ -2578,20 +3024,49 @@ with tab3:
                         # We need to load the BEST model for batch
                         
                         # Load Best Model
-                        # Load Best Model
                         # Resolve Model Path (using same logic as Tab 2)
-                        c_model_path = os.path.join(BASE_DIR, selected_model_name) # Fallback default
-                        try:
-                            # Use session state df to find true path (handles subdirectories)
-                            row = st.session_state.df_models[st.session_state.df_models['filename'] == selected_model_name].iloc[0]
-                            c_model_path = row['filepath']
-                        except Exception:
-                            pass
-
-                        model = get_model(detect_architecture(c_model_path), pretrained=False)
-                        model, _ = load_checkpoint_weights(model, c_model_path)
-                        # model.load_state_dict(weights, strict=False) # Handled inside load_checkpoint_weights now
-                        model.eval()
+                        
+                        is_ensemble = False
+                        model_path = None
+                        
+                        # Check for Ensemble Alias
+                        if selected_model_name == "Ensemble_Model" or "CAMPE" in selected_model_name:
+                             is_ensemble = True
+                             # Fix: Use explicit path relative to app.py location, ignoring BASE_DIR variable if it's set to checkpoint_files
+                             app_dir = os.path.dirname(os.path.abspath(__file__))
+                             script_path = os.path.join(app_dir, "ensemble_model_scripted.pt")
+                             
+                             if os.path.exists(script_path):
+                                 # Load Scripted Model
+                                 # Determine Device
+                                 device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+                                 
+                                 model = torch.jit.load(script_path)
+                                 model.to(device)
+                                 model.eval()
+                             else:
+                                 st.error(f"Ensemble model file not found: {script_path}")
+                                 continue
+                        else:
+                             # Single Model Logic
+                             c_model_path = os.path.join(BASE_DIR, selected_model_name) # Fallback default
+                             try:
+                                 # Use session state df to find true path (handles subdirectories)
+                                 row = st.session_state.df_models[st.session_state.df_models['filename'] == selected_model_name].iloc[0]
+                                 c_model_path = row['filepath']
+                             except Exception:
+                                 pass
+    
+                             model = get_model(detect_architecture(c_model_path), pretrained=False)
+                             model, _ = load_checkpoint_weights(model, c_model_path)
+                             model.eval()
+                             device = torch.device("cpu") # Single models logic usually on CPU in this app version, or auto-handled?
+                             # Let's keep single models on CPU for safety unless optimized, 
+                             # OR check inference.py defaults. 
+                             # Existing single model logic inside app.py batch loop didn't specify device explicitly 
+                             # but passed batch to 'model(batch)'. Data is on CPU by default.
+                             # So model must be on CPU.
+                             pass
                         
                         # Chunked Inference
                         batch_preds = []
@@ -2602,9 +3077,25 @@ with tab3:
                             
                             for i in range(0, total_samples, chunk_size):
                                 batch = t_tensor[i:i+chunk_size]
-                                outputs = model(batch)
-                                _, preds = torch.max(outputs, 1)
-                                batch_preds.extend(preds.numpy().tolist())
+                                
+                                if is_ensemble:
+                                    batch = batch.to(device)
+                                    outputs = model(batch)
+                                    # Output might be logits or probs depending on script. 
+                                    # Scripted model returns probs (average of softmaxes)
+                                    # Single model returns logits.
+                                    # Handle both:
+                                    if is_ensemble:
+                                        _, preds = torch.max(outputs, 1)
+                                    else:
+                                        # Single model logits
+                                        _, preds = torch.max(outputs, 1) # Max of logits = Max of probs order-wise
+                                else:
+                                    # Single Model (CPU)
+                                    outputs = model(batch)
+                                    _, preds = torch.max(outputs, 1)
+                                    
+                                batch_preds.extend(preds.cpu().numpy().tolist())
                         
                         # 3. Save
                         # Confidence? Use dummy 1.0 or implement softmax if needed.

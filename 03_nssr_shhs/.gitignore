@@ -1,11 +1,16 @@
 # Checkpoints (too large for GH)
 *.ckpt*
 *.ckpt_delete
+*.pt
+*.onnx
+*.onnx.data
+checkpoint_files/2000 files/2026-01-11_convnext_base_ensemble.pt
 
 # Data
 *.parquet
 *.npy
 *.edf
+*.bdf
 
 # Cache and Logs
 analysis_cache.json
@@ -27,3 +32,4 @@ predictions.sql
 processed_files.log
 temp_upload_*.parquet
 temp_upload_*.edf
+comparison_results_*.csv
