@@ -2040,6 +2040,90 @@ with tab2:
                         st.success(f"Reporte Legacy encontrado: `{os.path.basename(found_png)}`")
                         st.image(found_png, caption=f"Reporte de Inferencia (Legacy): {core_name}", use_container_width=True)
                     else:
+                        # 3. Fallback: Plot from SQL instantly
+                        # This logic mirrors restore_from_sql.py but for real-time display
+                        try:
+                            # We need to read SQL for this specific file
+                            # Since we don't want to parse the whole file, grep is better? 
+                            # But grep is OS dependent. Python line search is safer.
+                            
+                            if os.path.exists("predictions.sql"):
+                                st.info("Generando visualización instantánea desde base de datos SQL...")
+                                
+                                # Parsing SQL for this file
+                                # Simple parse optimized for single file
+                                target_fname = os.path.basename(h_file).replace(".done", "")
+                                # Filename in SQL might be target_fname or target_fname + ".parquet"
+                                # Usually "shhs1-200001.parquet"
+                                
+                                # Logic to extract data
+                                sql_epochs = {}
+                                
+                                # Optimization: Read file line by line
+                                # If file is HUGE (500MB), this takes 1-2 seconds. Acceptable.
+                                with open("predictions.sql", 'r', encoding='latin1', errors='ignore') as f:
+                                    for line in f:
+                                        if target_fname in line and line.strip().startswith("("):
+                                            # Parse line
+                                            parts = line.strip().rstrip(";,)").lstrip("(").split(", ")
+                                            if len(parts) >= 6:
+                                                sanitized = [p.strip("'") for p in parts]
+                                                # Check filename match
+                                                if sanitized[1] == target_fname:
+                                                    ep = int(sanitized[2])
+                                                    pred = {'label': sanitized[3], 'conf': float(sanitized[4]), 'model': sanitized[5]}
+                                                    gt = sanitized[6] if len(sanitized) > 6 else 'NULL'
+                                                    
+                                                    if ep not in sql_epochs: sql_epochs[ep] = {'base': -1, 'ens': -1, 'true': -1}
+                                                    
+                                                    stage_code = {'Wake':0, 'N1':1, 'N2':2, 'N3':3, 'REM':4}.get(pred['label'], -1)
+                                                    
+                                                    if "Ensemble" in pred['model']:
+                                                        sql_epochs[ep]['ens'] = stage_code
+                                                    else:
+                                                        sql_epochs[ep]['base'] = stage_code
+                                                        
+                                                    if gt != 'NULL':
+                                                        sql_epochs[ep]['true'] = {'Wake':0, 'N1':1, 'N2':2, 'N3':3, 'REM':4}.get(gt, -1)
+                                
+                                if sql_epochs:
+                                    # Plotting logic
+                                    # We need to reconstruct arrays
+                                    sorted_eps = sorted(sql_epochs.keys())
+                                    y_true_plot = [sql_epochs[e]['true'] for e in sorted_eps]
+                                    y_ens_plot = [sql_epochs[e]['ens'] for e in sorted_eps]
+                                    y_base_plot = [sql_epochs[e]['base'] for e in sorted_eps]
+                                    
+                                    # If GT missing in SQL, try XML?
+                                    if all(x == -1 for x in y_true_plot):
+                                        # Try load XML
+                                        # But user might not have XML. Skip if so.
+                                        pass
+                                    
+                                    # Use matplotlib to generate figure
+                                    # We need to import the plotting function OR re-implement simplified version
+                                    # Re-implement simplified version using Altair or matplotlib
+                                    # For consistency with "reports", matplotlib is better.
+                                    # Import dynamically to avoid top-level clutter
+                                    from restore_from_sql import generate_comparative_report
+                                    
+                                    # Temp path
+                                    temp_output = f"temp_plot_{core_name}"
+                                    generate_comparative_report(temp_output, y_true_plot, y_ens_plot, y_base_plot, "Baseline", 0,0,"", lang='ES')
+                                    
+                                    st.image(f"{temp_output}_es.png", caption=f"Visualización SQL: {core_name}", use_container_width=True)
+                                    # Cleanup
+                                    if os.path.exists(f"{temp_output}_es.png"): os.remove(f"{temp_output}_es.png")
+                                    if os.path.exists(f"{temp_output}_en.png"): os.remove(f"{temp_output}_en.png")
+                                    
+                                else:
+                                    st.warning(f"No se encontraron datos para {core_name} en predictions.sql")
+                            else:
+                                st.warning("No se encontró predictions.sql")
+
+                        except Exception as e_sql:
+                            st.error(f"Error generando gráfico SQL: {e_sql}")
+
                         st.info(f"No se encontraron reportes pre-generados para `{base_name}`. Ejecute el análisis para generarlos.")
 
         # --- RESULTS AREA (Full Main Column Width) ---
