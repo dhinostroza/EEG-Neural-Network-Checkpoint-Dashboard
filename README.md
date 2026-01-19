@@ -1,9 +1,20 @@
 # EEG Neural Network Checkpoint Dashboard
-![Version](https://img.shields.io/badge/version-v1.6.0-blue)
+![Version](https://img.shields.io/badge/version-v1.7.0-blue)
 
 A Streamlit-based dashboard for managing, analyzing, and running inference with PyTorch Lightning checkpoints trained on SHHS EEG data.
 
-### 🆕 v1.6.0 Changes
+### 🆕 v1.7.0 Changes
+- **Comparative Analysis (HECAM)**:
+    - **New Report Generation**: Implemented `process_hecam.py` to generate detailed comparative reports for BDF files (predictions vs baseline) without Ground Truth.
+    - **Visual Upgrades**: Reports now include "Agreement Matrices" (replacing Confusion Matrices) and standard comparative hypnograms with class distributions.
+    - **Streamlit Integration**: Dashboard now automatically detects and displays these new PNG reports from the `png/` directory.
+- **Dashboard & UX**:
+    - **Redundant Graph Fix**: Resolved an issue where the SQL fallback graph appeared redundantly below pre-generated reports.
+    - **Chronology Update**: Added "Ensemble Model Creation (Jan 2026)" to the Scripts timeline and set the default selection to "Sept 1-15".
+- **Bug Fixes**:
+    - **Sidebar Duplication**: Fixed logic to prevent duplicate entries for `.bdf` files in the processed files list.
+
+### 📜 v1.6.0 Changes
 - **Ground Truth & Validation**:
     - **External Hypnogram Loading**: Added fallback logic to load Ground Truth from `*Hypnogram.edf` files when internal Parquet labels are missing or invalid (fixing the 30-min truncated file issue).
     - **Confusion Matrix Labels**: Fixed `app.py` to display readable string labels (Wake, N1, N2, N3, REM) instead of integers in the confusion matrix.
