@@ -14,7 +14,7 @@ def analyze_pdf():
         text += page.extract_text() + "\n"
 
     # Search for keywords
-    keywords = ["learning rate", "optimizer", "adam", "sgd", "decay", "momentum", "batch size", "epoch"]
+    keywords = ["accuracy", "kappa", "f1", "state of the art", "comparison", "baseline", "deepsleepnet", "attentionsleep", "tinysleepnet"]
     
     print(f"--- Analyzing {os.path.basename(PDF_PATH)} ---")
     
