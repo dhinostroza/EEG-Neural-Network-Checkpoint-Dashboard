@@ -708,17 +708,21 @@ def retrieve_from_sql(filename):
     return None, None
 
 def get_processed_files_list():
-    """Reads processed_files.log to get list of files. Deduplicates by base name."""
+    """
+    Reads processed_files.log AND scans png/ folder to get list of files. 
+    Deduplicates by base name.
+    """
+    final_map = {}
+    
+    # 1. Read Log File
     log_file = "processed_files.log"
     if os.path.exists(log_file):
         with open(log_file, "r") as f:
-            raw_files = [line.strip() for line in f if line.strip()]
-        
-        # Deduplicate: shhs1-200001.parquet vs shhs1-200001_processed.parquet
-        final_map = {}
-        for fname in raw_files:
+            raw_log_files = [line.strip() for line in f if line.strip()]
+            
+        for fname in raw_log_files:
             # Base name strategy: remove extension, remove _processed
-            base = fname.replace(".parquet", "").replace(".edf", "").replace("_processed", "")
+            base = fname.replace(".parquet", "").replace(".edf", "").replace(".bdf", "").replace("_processed", "")
             
             # Logic: If we haven't seen this base, take it.
             # If we HAVE seen it, prefer the one with "_processed"
@@ -729,9 +733,43 @@ def get_processed_files_list():
                 # If incoming has _processed and stored doesn't, upgrade
                 if "_processed" in fname and "_processed" not in current_stored:
                     final_map[base] = fname
+
+    # 2. Scan PNG Folder for Reports (e.g. 2026-01-18_SC4001E_en.png)
+    # Pattern: [Date]_[Filename]_[Lang].png
+    # We want to extract 'Filename' (e.g. SC4001E or shhs1-200822)
+    png_files = glob.glob(os.path.join("png", "*_*_*.png"))
+    for p_path in png_files:
+        try:
+            # Basename: 2026-01-18_SC4001E_en.png
+            p_name = os.path.basename(p_path)
+            # Split by underscores. 
+            parts = p_name.split('_')
+            # Assuming format: Date_Name_Lang.png
+            # Name might contain hyphens (shhs1-200822), but underscores separate metadata?
+            # User example: 2026-01-18_SC4001E_en.png -> SC4001E
+            # User example: 2026-01-19_shhs1-200822_en.png -> shhs1-200822
+            # So the 'Name' is the middle part(s). 
+            # Parts: ['2026-01-18', 'SC4001E', 'en.png'] OR ['2026-01-19', 'shhs1-200822', 'en.png']
+            
+            if len(parts) >= 3:
+                # Extract middle component
+                # Join parts 1 to -1 (exclude date and lang) in case filename has underscores?
+                # But typical shhs filenames don't have underscores, they use hyphens.
+                # SC filenames are SC4001E.
+                # Safer: index 1.
+                core_name = parts[1]
+                
+                # If core_name is not in map, add it as a "virtual" parquet file
+                # We assume it corresponds to a .parquet file
+                if core_name not in final_map:
+                    # Construct a displayable filename
+                    # Prefer adding it as .parquet since the system expects that for selecting
+                    final_map[core_name] = f"{core_name}.parquet"
                     
-        return sorted(list(final_map.values()))
-    return []
+        except Exception:
+            continue
+
+    return sorted(list(final_map.values()))
 
 def save_results_to_sql(filename, predictions, confidence_scores, model_name, patient_id="UNKNOWN", true_labels=None):
     """Appends new results to SQL and Log. Includes Ground Truth if available."""
@@ -1046,21 +1084,29 @@ Migrated to Python. Replicated EEGSNet in PyTorch. Implemented basic <code>Sleep
 <i>Functional but hit memory limits with full SHHS dataset.</i>
 </div>
 </div>
-<div class="timeline-item">
-<div class="timeline-date">Sept 1-15, 2025</div>
-<div class="timeline-title">Architecture Upgrade</div>
+<div class="timeline-item" style="border-left: 2px solid #3366ff;">
+<div class="timeline-date" style="color: #3366ff;">Sept 1-15, 2025</div>
+<div class="timeline-title" style="color: #3366ff;">Architecture Upgrade</div>
 <div class="timeline-desc">
 Adopted <b>ConvNeXt V2</b> (Tiny/Base), EfficientNetV2, ViT, and tested Transformers (Swin). 
 Introduced Class Weights to handle imbalance (N1 rare).
 </div>
 </div>
-<div class="timeline-item" style="border-left: 2px solid #3366ff;">
-<div class="timeline-date" style="color: #3366ff;">Sept 20, 2025 (SMOTE)</div>
-<div class="timeline-title" style="color: #3366ff;">High-Performance Streaming</div>
+<div class="timeline-item">
+<div class="timeline-date">Sept 20, 2025 (SMOTE)</div>
+<div class="timeline-title">High-Performance Streaming</div>
 <div class="timeline-desc">
 Implemented <b>ChunkedIterableDataset</b> with Consolidated .npy files. 
 Enabled <code>bf16</code> mixed precision and automated checkpointing. SMOTE implementation.
 <i>Can scale to infinite dataset size without RAM issues.</i>
+</div>
+</div>
+</div>
+<div class="timeline-item">
+<div class="timeline-date">Jan 10-19, 2026</div>
+<div class="timeline-title">Ensemble Model Creation</div>
+<div class="timeline-desc">
+This combines the accuracy of the top three models from September, 2025. Ensemble becomes the champion model.
 </div>
 </div>
 </div>
@@ -1117,21 +1163,29 @@ Se replicó EEGSNet en <i>PyTorch</i>. Se implementó un <code>SleepDataset</cod
 <i>Funcional, pero alcanzó límites de memoria con el dataset completo SHHS.</i>
 </div>
 </div>
-<div class="timeline-item">
-<div class="timeline-date">Sept 1-15, 2025</div>
-<div class="timeline-title">Actualización de la arquitectura</div>
+<div class="timeline-item" style="border-left: 2px solid #3366ff;">
+<div class="timeline-date" style="color: #3366ff;">Sept 1-15, 2025</div>
+<div class="timeline-title" style="color: #3366ff;">Actualización de la arquitectura</div>
 <div class="timeline-desc">
 Adopción de <b>ConvNeXt V2</b> (Tiny/Base) y pruebas con EfficientNetV2, ViT y Transformers (Swin).
 Introducción de pesos de clase para manejar el desequilibrio (N1 es infrecuente).
 </div>
 </div>
-<div class="timeline-item" style="border-left: 2px solid #3366ff;">
-<div class="timeline-date" style="color: #3366ff;">Sept 20, 2025 (SMOTE)</div>
-<div class="timeline-title" style="color: #3366ff;"><i>Streaming</i> de alto rendimiento</div>
+<div class="timeline-item">
+<div class="timeline-date">Sept 20, 2025 (SMOTE)</div>
+<div class="timeline-title"><i>Streaming</i> de alto rendimiento</div>
 <div class="timeline-desc">
 Implementación de <b>ChunkedIterableDataset</b> con archivos .npy consolidados.
 Habilitación de precisión mixta <code>bf16</code> y <i>checkpointing</i> automatizado. Implementación de SMOTE.
 <i>Puede escalar a un tamaño de dataset infinito sin problemas de RAM.</i>
+</div>
+</div>
+</div>
+<div class="timeline-item">
+<div class="timeline-date">Ene 10-19, 2026</div>
+<div class="timeline-title">Creación del modelo Ensamble</div>
+<div class="timeline-desc">
+Este combina la precisión de los tres mejores modelos de septiembre, 2025. Ensamble se convierte en el modelo campeón.
 </div>
 </div>
 </div>
@@ -1930,36 +1984,140 @@ with tab2:
             import glob
             
             for h_file in selected_history_files:
-                # 1. Try Direct Match for New 3-Way Reports
-                base_name = os.path.splitext(h_file)[0] # SC4001E or SC4001E_processed
+                # Core name extraction
+                base_name = os.path.basename(h_file)
+                core_name = os.path.splitext(base_name)[0].replace("_processed", "")
                 
-                png_stats = os.path.join("png", f"{base_name}_stats_comparison.png")
-                png_hypno = os.path.join("png", f"{base_name}_comparison.png")
+                # --- NEW LOGIC: Date-Prefixed Reports ---
+                # Pattern: [YYYY-MM-DD]_filename_[lang].png
                 
-                # Fallback: Check if file has _processed but image doesn't (or vice versa)
-                if not os.path.exists(png_stats) and "_processed" in base_name:
-                     base_stripped = base_name.replace("_processed", "")
-                     if os.path.exists(os.path.join("png", f"{base_stripped}_stats_comparison.png")):
-                         png_stats = os.path.join("png", f"{base_stripped}_stats_comparison.png")
-                         png_hypno = os.path.join("png", f"{base_stripped}_comparison.png")
-
-                found_new_reports = False
+                # Prioritize current language
+                if LANG == 'es':
+                    patterns = [
+                        os.path.join("png", f"*_{core_name}_es.png"),
+                        os.path.join("png", f"*_{core_name}_en.png")
+                    ]
+                else:
+                    patterns = [
+                        os.path.join("png", f"*_{core_name}_en.png"),
+                        os.path.join("png", f"*_{core_name}_es.png")
+                    ]
                 
-                if os.path.exists(png_stats):
-                    st.success(f"Reporte Estadístico encontrado: `{os.path.basename(png_stats)}`")
-                    st.image(png_stats, caption=f"Estadísticas Comparativas: {base_name}", use_container_width=True)
-                    found_new_reports = True
+                found_report = None
                 
-                if os.path.exists(png_hypno):
-                    st.success(f"Hipnograma encontrado: `{os.path.basename(png_hypno)}`")
-                    st.image(png_hypno, caption=f"Hipnograma Comparativo: {base_name}", use_container_width=True)
-                    found_new_reports = True
+                for pat in patterns:
+                    matches = glob.glob(pat)
+                    if matches:
+                        # Sort by date descending (latest first)
+                        # Filename starts with YYYY-MM-DD, so string sort works
+                        matches.sort(reverse=True)
+                        found_report = matches[0]
+                        break
+                
+                if found_report:
+                    fname = os.path.basename(found_report)
+                    # Extract info for caption
+                    parts = fname.split('_')
+                    date_str = parts[0] if len(parts) > 0 else "Unknown Date"
                     
+                    caption_text = f"Reporte Generado ({date_str}): {core_name}" if LANG == 'es' else f"Report Generated ({date_str}): {core_name}"
+                    
+                    st.success(f"{'Reporte encontrado' if LANG == 'es' else 'Report found'}: `{fname}`")
+                    st.image(found_report, caption=caption_text, use_container_width=True)
+                
+                else:
+                    # Fallback or No Report Message
+                    pass # Will fall through to SQL plot or CSV loading
+                    
+                    # Fallback: Plot from SQL instantly
+                    # This logic mirrors restore_from_sql.py but for real-time display
+                    try:
+                        # We need to read SQL for this specific file
+                        # Since we don't want to parse the whole file, grep is better? 
+                        # But grep is OS dependent. Python line search is safer.
+                        
+                        if os.path.exists("predictions.sql"):
+                            st.info("Generando visualización instantánea desde base de datos SQL...")
+                            
+                            # Parsing SQL for this file
+                            # Simple parse optimized for single file
+                            target_fname = os.path.basename(h_file).replace(".done", "")
+                            # Filename in SQL might be target_fname or target_fname + ".parquet"
+                            # Usually "shhs1-200001.parquet"
+                            
+                            # Logic to extract data
+                            sql_epochs = {}
+                            
+                            # Optimization: Read file line by line
+                            # If file is HUGE (500MB), this takes 1-2 seconds. Acceptable.
+                            with open("predictions.sql", 'r', encoding='latin1', errors='ignore') as f:
+                                for line in f:
+                                    if target_fname in line and line.strip().startswith("("):
+                                        # Parse line
+                                        parts = line.strip().rstrip(";,)").lstrip("(").split(", ")
+                                        if len(parts) >= 6:
+                                            sanitized = [p.strip("'") for p in parts]
+                                            # Check filename match
+                                            if sanitized[1] == target_fname:
+                                                ep = int(sanitized[2])
+                                                pred = {'label': sanitized[3], 'conf': float(sanitized[4]), 'model': sanitized[5]}
+                                                gt = sanitized[6] if len(sanitized) > 6 else 'NULL'
+                                                
+                                                if ep not in sql_epochs: sql_epochs[ep] = {'base': -1, 'ens': -1, 'true': -1}
+                                                
+                                                stage_code = {'Wake':0, 'N1':1, 'N2':2, 'N3':3, 'REM':4}.get(pred['label'], -1)
+                                                
+                                                if "Ensemble" in pred['model']:
+                                                    sql_epochs[ep]['ens'] = stage_code
+                                                else:
+                                                    sql_epochs[ep]['base'] = stage_code
+                                                    
+                                                if gt != 'NULL':
+                                                    sql_epochs[ep]['true'] = {'Wake':0, 'N1':1, 'N2':2, 'N3':3, 'REM':4}.get(gt, -1)
+                            
+                            if sql_epochs:
+                                # Plotting logic
+                                # We need to reconstruct arrays
+                                sorted_eps = sorted(sql_epochs.keys())
+                                y_true_plot = [sql_epochs[e]['true'] for e in sorted_eps]
+                                y_ens_plot = [sql_epochs[e]['ens'] for e in sorted_eps]
+                                y_base_plot = [sql_epochs[e]['base'] for e in sorted_eps]
+                                
+                                # If GT missing in SQL, try XML?
+                                if all(x == -1 for x in y_true_plot):
+                                    # Try load XML
+                                    # But user might not have XML. Skip if so.
+                                    pass
+                                
+                                # Use matplotlib to generate figure
+                                # We need to import the plotting function OR re-implement simplified version
+                                # Re-implement simplified version using Altair or matplotlib
+                                # For consistency with "reports", matplotlib is better.
+                                # Import dynamically to avoid top-level clutter
+                                from restore_from_sql import generate_comparative_report
+                                
+                                # Temp path
+                                temp_output = f"temp_plot_{core_name}"
+                                generate_comparative_report(temp_output, y_true_plot, y_ens_plot, y_base_plot, "Baseline", 0,0,"", lang='ES')
+                                
+                                st.image(f"{temp_output}_es.png", caption=f"Visualización SQL: {core_name}", use_container_width=True)
+                                # Cleanup
+                                if os.path.exists(f"{temp_output}_es.png"): os.remove(f"{temp_output}_es.png")
+                                if os.path.exists(f"{temp_output}_en.png"): os.remove(f"{temp_output}_en.png")
+                                
+                            else:
+                                st.warning(f"No se encontraron datos para {core_name} en predictions.sql")
+                        else:
+                            st.warning("No se encontró predictions.sql")
+
+                    except Exception as e_sql:
+                        st.error(f"Error generando gráfico SQL: {e_sql}")
+
+                    st.info(f"No se encontraron reportes pre-generados para `{base_name}`. Ejecute el análisis para generarlos.")
+                        
                 # 3. Try to load CSV for Metrics (Accuracy & Confusion Matrix)
                 # Attempt to find the CSV generated by convert_and_analyze.py
                 # It is usually named comparison_results_{base_name}.csv in the root or same dir
-                # 3. Try to load CSV for Metrics (Accuracy & Confusion Matrix)
-                # Attempt to find the CSV generated by convert_and_analyze.py
                 
                 # Priority 1: Exact Match (e.g. comparison_results_SC4001E_processed.csv)
                 csv_filename = f"comparison_results_{base_name}.csv"
@@ -2020,33 +2178,11 @@ with tab2:
                         print(f"Error loading CSV metrics: {e_csv}") # Log to console
                         # st.warning(f"No se pudieron cargar las métricas numéricas: {e_csv}")
                     
-                # 2. If NO new reports found, try Legacy Search (Original functionality)
-                if not found_new_reports:
-                    core_name = os.path.splitext(h_file)[0].replace("_processed", "")
-                    patterns = [
-                        os.path.join("png", f"*_{core_name}_es.png"),
-                        os.path.join("png", f"*_{core_name}_en.png"),
-                        os.path.join("png", f"*_{core_name}_*.png")
-                    ]
-                    found_png = None
-                    for pat in patterns:
-                        matches = glob.glob(pat)
-                        if matches:
-                            matches.sort(reverse=True)
-                            found_png = matches[0]
-                            break
+                    # 2. If NO new reports found, try Legacy Search (Original functionality)
+                    # But grep is OS dependent. Python line search is safer.
                     
-                    if found_png:
-                        st.success(f"Reporte Legacy encontrado: `{os.path.basename(found_png)}`")
-                        st.image(found_png, caption=f"Reporte de Inferencia (Legacy): {core_name}", use_container_width=True)
-                    else:
-                        # 3. Fallback: Plot from SQL instantly
-                        # This logic mirrors restore_from_sql.py but for real-time display
+                    if not found_report:
                         try:
-                            # We need to read SQL for this specific file
-                            # Since we don't want to parse the whole file, grep is better? 
-                            # But grep is OS dependent. Python line search is safer.
-                            
                             if os.path.exists("predictions.sql"):
                                 st.info("Generando visualización instantánea desde base de datos SQL...")
                                 
@@ -2120,7 +2256,7 @@ with tab2:
                                     st.warning(f"No se encontraron datos para {core_name} en predictions.sql")
                             else:
                                 st.warning("No se encontró predictions.sql")
-
+    
                         except Exception as e_sql:
                             st.error(f"Error generando gráfico SQL: {e_sql}")
 
