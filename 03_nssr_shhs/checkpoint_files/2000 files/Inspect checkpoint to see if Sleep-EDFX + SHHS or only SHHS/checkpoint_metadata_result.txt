@@ -1,0 +1,13 @@
+=== CHECKPOINT TOP-LEVEL KEYS ===
+['epoch', 'global_step', 'pytorch-lightning_version', 'state_dict', 'loops', 'callbacks', 'optimizer_states', 'lr_schedulers', 'hparams_name', 'hyper_parameters']
+
+=== CONTENTS OF 'hyper_parameters' ===
+model_name: convnext_base
+learning_rate: 2e-05
+class_weights: [0.7, 8.0, 0.5, 1.5, 1.2]
+epochs: 40
+
+=== CONTENTS OF 'callbacks' ===
+EarlyStopping{'monitor': 'val_loss', 'mode': 'min'}: {'wait_count': 0, 'stopped_epoch': 0, 'best_score': tensor(0.5533), 'patience': 10}
+ModelCheckpoint{'monitor': 'val_loss', 'mode': 'min', 'every_n_train_steps': 0, 'every_n_epochs': 1, 'train_time_interval': None}: {'monitor': 'val_loss', 'best_model_score': tensor(0.5533), 'best_model_path': '/content/drive/MyDrive/final_model_checkpoint/best-model-20250904_093713_convnext_base_2000files_lr2e-05_cwN1-8.0_workers2.ckpt', 'current_score': tensor(0.5533), 'dirpath': '/content/drive/MyDrive/final_model_checkpoint', 'best_k_models': {'/content/drive/MyDrive/final_model_checkpoint/best-model-20250904_093713_convnext_base_2000files_lr2e-05_cwN1-8.0_workers2.ckpt': tensor(0.5533)}, 'kth_best_model_path': '/content/drive/MyDrive/final_model_checkpoint/best-model-20250904_093713_convnext_base_2000files_lr2e-05_cwN1-8.0_workers2.ckpt', 'kth_value': tensor(0.5533), 'last_model_path': ''}
+

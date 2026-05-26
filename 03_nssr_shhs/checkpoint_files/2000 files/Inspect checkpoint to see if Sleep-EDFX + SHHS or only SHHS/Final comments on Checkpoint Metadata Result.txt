@@ -1,0 +1,48 @@
+Looking at the output, the checkpoint unfortunately didn't explicitly save the dataset names or paths in the hyper_parameters dictionary. It only saved the training parameters (like the convnext_base architecture, your learning rate, your N1-heavy class weights, and epochs).
+
+However, based on the metadata and the naming conventions, there is a very strong contextual clue that points to this being only SHHS:
+
+The "2000files" indicator: The ModelCheckpoint path shows the filename includes 2000files. The Sleep-EDFx dataset only contains around 197 whole-night recordings (in its expanded version). SHHS, on the other hand, contains thousands of records. If "2000 files" refers to individual patient PSG recordings or extracted epochs, it is highly likely this was an SHHS training run.
+
+The Colab Paths: The paths (/content/drive/MyDrive/...) confirm you trained this specific run on Google Colab, meaning it was reading from whichever dataset you had mounted in your Google Drive at that time (likely your SHHS subset).
+
+Because your LightningModule wasn't explicitly configured to log the dataloader arguments, the checkpoint itself is "blind" to the data source.
+
+A quick one-line fix using self.save_hyperparameters() to add to your PyTorch Lightning script, so your future Colab or local runs automatically embed the dataset names directly into the checkpoint:
+To make sure your future checkpoints automatically log exactly which datasets you used, you just need to add self.save_hyperparameters() to the __init__ method of your PyTorch Lightning model.
+
+For this to work perfectly, you also need to make sure you are passing the dataset name or path as an argument when you initialize the model.
+
+Here is how it looks in practice, using your specific training parameters as an example:
+
+-------------------------------
+Python
+import pytorch_lightning as pl
+
+class SleepStageClassifier(pl.LightningModule):
+    def __init__(
+        self, 
+        dataset_name: str,  # Pass 'SHHS', 'Sleep-EDFX', or 'Combined' here
+        model_name: str = 'convnext_base', 
+        learning_rate: float = 2e-05, 
+        class_weights: list = [0.7, 8.0, 0.5, 1.5, 1.2]
+    ):
+        super().__init__()
+        
+        # This is the magic line. It automatically captures all the arguments 
+        # passed to __init__ and saves them in the checkpoint's 'hyper_parameters' dictionary.
+        self.save_hyperparameters()
+        
+        # ... the rest of your ConvNeXT V2 model initialization ...
+---------------------------------
+
+By doing this, the next time you run your inspection script on a new checkpoint, the === CONTENTS OF 'hyper_parameters' === section will output:
+
+Plaintext
+dataset_name: SHHS
+model_name: convnext_base
+learning_rate: 2e-05
+class_weights: [0.7, 8.0, 0.5, 1.5, 1.2]
+This completely eliminates the guesswork, regardless of whether you train locally or on a cloud instance. If you also use a LightningDataModule to handle your EEG data, you can put self.save_hyperparameters() in its __init__ as well, and Lightning will save those arguments under the datamodule_hyper_parameters key we looked for earlier.
+
+Would you like me to help you review the script where you initialize your dataset so we can pass that dataset_name variable in seamlessly?
