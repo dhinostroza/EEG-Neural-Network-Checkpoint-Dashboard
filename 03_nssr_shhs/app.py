@@ -1430,6 +1430,42 @@ with tab1:
         else:
             df_display = df.copy()
 
+        # --- DISPLAY-ONLY FILENAME CORRECTIONS ---
+        # Fix time-zone / timestamp inconsistencies in checkpoint names.
+        # Only the displayed name and date_modified column are patched;
+        # the actual .ckpt files on disk are NOT renamed.
+        FILENAME_DISPLAY_CORRECTIONS = {
+            "2025-09-19_04-34_convnext_base_consolidated_cwN1-6.5-epoch=3-val_loss=0.5971.ckpt": {
+                "new_name": "2025-09-19_03-00_convnext_base_consolidated_cwN1-6.5-epoch=3-val_loss=0.5971.ckpt",
+                "date_modified": "2025-09-19 03:00",
+            },
+            "2025-09-04_05-36_convnext_base_2000files_lr2e-05_cwN1-8.0_workers2.ckpt": {
+                "new_name": "2025-09-04_09-37_convnext_base_2000files_lr2e-05_cwN1-8.0_workers2.ckpt",
+                "date_modified": "2025-09-04 09:37",
+            },
+            "2025-09-09_15-43_convnext_base_2000files_Augmented_cwN1-6.5.ckpt": {
+                "new_name": "2025-09-08_23-31_convnext_base_2000files_Augmented_cwN1-6.5.ckpt",
+                "date_modified": "2025-09-08 23:31",
+            },
+        }
+        for old_name, correction in FILENAME_DISPLAY_CORRECTIONS.items():
+            mask = df_display["filename"] == old_name
+            if mask.any():
+                df_display.loc[mask, "filename"] = correction["new_name"]
+                df_display.loc[mask, "date_modified"] = correction["date_modified"]
+
+        # --- HIDE DUPLICATE ROWS ---
+        # The original 09-37 file on disk now collides with the display-
+        # corrected 05-36→09-37 row.  Hide the original (whose filesystem
+        # date_modified is still "2025-09-04 05:36") to avoid a visual duplicate.
+        HIDDEN_ROWS = [
+            ("2025-09-04_09-37_convnext_base_2000files_lr2e-05_cwN1-8.0_workers2.ckpt", "2025-09-04 05:36"),
+        ]
+        for hide_name, hide_date in HIDDEN_ROWS:
+            df_display = df_display[
+                ~((df_display["filename"] == hide_name) & (df_display["date_modified"] == hide_date))
+            ]
+
         # --- INJECT CHAMPION MODEL ALIAS ---
         # Add a special row for the Ensemble Model so it appears in the table/list
         ensemble_row = {
@@ -1711,7 +1747,6 @@ with tab1:
         # Data Table
         st.subheader(t("model_registry"))
         
-        # Styling
         def highlight_good_models(s):
             is_good = False
             try:
