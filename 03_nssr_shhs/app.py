@@ -3421,51 +3421,20 @@ with tab4:
 # TAB EEGSNet
 # ==============================================================================
 with tab_eegsnet:
-    st.title("Proyecto EEGSNet")
-    st.info("Este módulo enlaza al dashboard interactivo en React para la visualización detallada del proyecto EEGSNet.")
-    
-    st.markdown("### 🌐 Dashboard Interactivo")
-    st.markdown(
-        '<a href="http://localhost:5173/" target="_blank" style="display: block; padding: 1em; color: white; background-color: #4F46E5; text-decoration: none; border-radius: 8px; font-weight: bold; text-align: center; margin: 20px 0; font-size: 1.1em;">'
-        '🚀 Abrir Dashboard de EEGSNet en Nueva Pestaña'
-        '</a>',
-        unsafe_allow_html=True
-    )
-    
-    st.markdown("---")
-    st.markdown("### 📁 Explorador de Archivos Backend")
-    
-    eegsnet_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "02_python_eeg"))
-    
-    if os.path.exists(eegsnet_dir):
-        files = [f for f in os.listdir(eegsnet_dir) if os.path.isfile(os.path.join(eegsnet_dir, f))]
-        
-        if files:
-            e_select = "Selecciona un archivo para ver:" if LANG == 'es' else "Select a file to view:"
-            selected_file = st.selectbox(e_select, sorted(files))
-            
-            if selected_file:
-                file_path = os.path.join(eegsnet_dir, selected_file)
-                e_viewing = "Viendo" if LANG == 'es' else "Viewing"
-                st.markdown(f"**{e_viewing} `{selected_file}`**")
-                
-                # Check if it's a PDF
-                if selected_file.endswith('.pdf'):
-                    e_pdf_err = "El archivo PDF no se puede previsualizar en bloque de código. Por favor ábrelo localmente." if LANG == 'es' else "PDF file cannot be previewed in code block. Please open it locally."
-                    st.info(e_pdf_err)
-                else:
-                    try:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            code_content = f.read()
-                        st.code(code_content, language="python" if selected_file.endswith(".py") else "text")
-                    except Exception as e:
-                        st.error(f"Error reading file: {e}")
-        else:
-            e_not_found = "No se encontraron archivos en el directorio 02_python_eeg." if LANG == 'es' else "No files found in 02_python_eeg directory."
-            st.info(e_not_found)
-    else:
-        e_dir_err = "No se encontró el directorio EEGSNet." if LANG == 'es' else "EEGSNET folder not found."
-        st.info(e_dir_err)
+    import streamlit.components.v1 as components
+    components.html("""
+        <script>
+            if (!window.sessionStorage.getItem('eegsnet_opened')) {
+                window.open('http://localhost:5173/', '_blank');
+                window.sessionStorage.setItem('eegsnet_opened', 'true');
+                setTimeout(() => window.sessionStorage.removeItem('eegsnet_opened'), 5000);
+            }
+        </script>
+        <div style="font-family: sans-serif; text-align: center; color: #333; padding-top: 2rem;">
+            <h3>Abriendo el Dashboard de EEGSNet...</h3>
+            <p>Revisa la nueva pestaña en tu navegador.</p>
+        </div>
+    """, height=200)
 
 # ==============================================================================
 # TAB GLOSSARY
