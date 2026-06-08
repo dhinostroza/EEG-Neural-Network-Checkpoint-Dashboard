@@ -3470,56 +3470,9 @@ with tab_glossary:
 # TAB EEGSNet
 # ==============================================================================
 with tab_eegsnet:
-    img_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "frontend", "public", "img"))
-    
     if LANG == 'es':
-        st.title("Análisis Experimental")
-        st.subheader("Análisis del dataset Sleep-EDF-8 (Matlab/Web app con GPU mps para Apple Silicon)")
-        
-        st.markdown("""
-        Este ejercicio valida la arquitectura **EEGSNet (CNN-LSTM)**¹ en el subconjunto **Sleep-EDF-8**. Utiliza scripts ejecutados en **entorno Python local**, aprovechando la aceleración **MPS (Metal Performance Shaders)** en MacOS. Se entrenó el modelo EEGSNet para la clasificación de 5 etapas de sueño, utilizando **Leave-One-Subject-Out (LOSO)** para una estimación robusta. Se optó por migrar los scripts a este entorno por cuanto Matlab no reconoce la tarjeta gráfica de Apple Silicon (mps Neural Engine GPU).
-        
-        ¹ Li, C., Qi, Y., Ding, X., Zhao, J., Sang, T., & Lee, M. (2022). A Deep Learning Method Approach for Sleep Stage Classification with EEG Spectrogram. *International journal of environmental research and public health*, 19(10), 6322. https://doi.org/10.3390/ijerph19106322
-        """)
-        
-        st.markdown("### Configuración")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("- **Dataset:** Sleep-EDF-8 (8 sujetos, 15 206 espectrogramas)")
-            st.markdown("- **Modelo:** EEGSNet (CNN + BI-LSTM + Clasificador auxiliar)")
-            st.markdown("- **Secuencia:** Ventana de contexto = 5 épocas")
-        with col2:
-            st.markdown("- **Pérdida:** CrossEntropy + 0.5")
-            st.markdown("- **AuxLoss:** Ponderada")
-            st.markdown("- **Ejecución:** Python (MPS/Metal) - Batch 32")
-            
-        st.info("Para la replicación y mejora del modelo de clasificación de etapas de sueño, se decidió una divergencia metodológica respecto al artículo original de Li et al. (2022) en cuanto a las pruebas de validez en el dataset Sleep-EDF-8. Li (2022) empleó una estrategia de validación cruzada de 20 pliegues a nivel de época (epoch-wise) para este subconjunto específico, lo que significa que mezclaron todas las épocas en un gran conjunto y las dividieron en 20 fragmentos aleatorios. Esto permite que las épocas del Sujeto 1 aparezcan tanto en el conjunto de entrenamiento como en el de prueba, lo que probablemente arroje resultados de precisión más altos que LOSO, pero sobreestimando potencialmente el rendimiento en el mundo real.\n\nLa implementación establecida en este proyecto utiliza una estrategia de validación cruzada Leave-One-Subject-Out (LOSO). Esta decisión fue deliberada y prioriza el rigor clínico y la aplicabilidad en el mundo real sobre la maximización teórica de métricas.")
-        
-        st.caption("Nota: El entrenamiento se hizo localmente utlizando mps. Los archivos '.m' y '.mat' de Matlab fueron readaptados para funcionar en esta aplicación web y generar los gráficos restantes presentes en el reporte.")
-        
-        st.markdown("---")
-        st.markdown("### Arquitectura y Análisis de Señales")
-        
-        col_img1, col_img2 = st.columns(2)
-        with col_img1:
-            st.markdown("#### Análisis de espectrograma (Matlab)")
-            st.caption("Visualización Tiempo-Frecuencia de una época de sueño (30s). Se observa la potencia espectral en distintas bandas de frecuencia. N1 es inherentemente 'desordenada' (messy). Fisiológicamente, N1 es la zona de transición. Se pierden las bandas Alpha fuertes y 'homogéneas' de la vigilia, pero aún no se han establecido los Husos estables (N2) o las ondas Delta (N3). Se caracteriza por frecuencias mixtas de bajo voltaje, que parecen 'ruido disperso' o 'heterogeneidad' en un espectrograma. Preprocesamiento: se utilizó la Transformación Logarítmica, que eleva el ruido de fondo de baja potencia al rango visible (las manchas azules/verdes). Esto evita que el modelo ignore detalles sutiles, pero hace que la imagen se vea 'granulada'.")
-            
-            subcol1, subcol2 = st.columns(2)
-            with subcol1:
-                st.image(os.path.join(img_dir, "spec_Wake.png"), caption="Wake Stage", use_container_width=True)
-                st.image(os.path.join(img_dir, "spec_N2.png"), caption="N2 Stage", use_container_width=True)
-            with subcol2:
-                st.image(os.path.join(img_dir, "spec_N1.png"), caption="N1 Stage", use_container_width=True)
-                st.image(os.path.join(img_dir, "spec_N3.png"), caption="N3 Stage", use_container_width=True)
-                
-        with col_img2:
-            st.markdown("#### Grafo de capas (EEGSNet - Matlab)")
-            st.caption("La arquitectura combina convoluciones separables en profundidad (Depthwise Separable Conv) para extracción de características espaciales y capas LSTM bidireccionales para capturar dependencias temporales.")
-            st.image(os.path.join(img_dir, "model_architecture.png"), use_container_width=True)
-
-        st.markdown("---")
-        
+        st.title("Proyecto EEGSNet")
+        st.info("ℹ️ Este módulo te permite interactuar y usar el código de EEGSNet directamente.")
         e_run_title = "🚀 Ejecutar Entrenamiento EEGSNet"
         e_run_desc = "Ejecuta el script `train.py`. Nota: Esto puede tomar un tiempo considerable."
         e_btn = "Ejecutar train.py (EEGSNet)"
@@ -3534,54 +3487,8 @@ with tab_eegsnet:
         e_not_found = "No se encontraron archivos en el directorio 02_python_eeg."
         e_dir_err = "No se encontró el directorio en"
     else:
-        st.title("Experimental Analysis")
-        st.subheader("Experimental Analysis (Sleep-EDF-8)")
-        
-        st.markdown("""
-        This experiment validates the **EEGSNet (CNN-LSTM)**¹ architecture on the **Sleep-EDF-8** subset (8 subjects). The model is trained using **Leave-One-Subject-Out (LOSO)** for robust estimation.
-        
-        ¹ Li, C., Qi, Y., Ding, X., Zhao, J., Sang, T., & Lee, M. (2022). A Deep Learning Method Approach for Sleep Stage Classification with EEG Spectrogram. *International journal of environmental research and public health*, 19(10), 6322. https://doi.org/10.3390/ijerph19106322
-        """)
-        
-        st.markdown("### Configuration")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("- **Dataset:** Sleep-EDF (8 subjects).")
-            st.markdown("- **Samples (Epochs):** 15,206.")
-            st.markdown("- **Preprocessing:** Log-Transform + Z-Score Normalization (v1.1)")
-            st.markdown("- **Model:** EEGSNet (CNN + Bi-LSTM + Auxiliary Classifier)")
-        with col2:
-            st.markdown("- **Sequence Training:** Context Window = 5 Epochs")
-            st.markdown("- **Loss Function:** CrossEntropy + 0.5 * AuxLoss (Weighted)")
-            st.markdown("- **Execution:** Python (MPS/Metal) - Batch 32")
-            
-        st.info("For the replication and enhancement of the sleep stage classification model, a methodological divergence was decided from the original paper by Li et al. (2022) regarding validity testing on the Sleep-EDF-8 dataset. While Li (2022) employed a 20-fold epoch-wise cross-validation strategy for this specific subset, meaning that they mixed all epochs together into one big pool and split them into 20 random chunks. This allows epochs from Subject 1 to appear in both the training set and the test set likely yielding higher accuracy results than LOSO, but potentially overestimating real-world performance.\n\nThe implementation set in this project utilizes a Leave-One-Subject-Out (LOSO) cross-validation strategy. This decision was deliberate and prioritizes clinical rigor and real-world applicability over theoretical metric maximization.")
-        
-        st.caption("Originally, the processing scripts and labels (.mat) were generated in Matlab. To ensure repeatability and extend the analysis, these files were processed and adapted for this web application, enabling the generation of new charts and metrics in real-time.")
-        
-        st.markdown("---")
-        st.markdown("### Architecture & Signal Analysis")
-        
-        col_img1, col_img2 = st.columns(2)
-        with col_img1:
-            st.markdown("#### Real N1 Spectrogram (Channel Fpz-Cz)")
-            st.caption("Visual sample (Index 1232). The model was trained on the full set of 15,206 spectrograms. N1 is inherently \"messy\". Physiologically, N1 is the transition zone. You lose the strong, \"homogeneous\" Alpha bands of wakefulness, but you haven't yet established the stable Spindles (N2) or Delta waves (N3). It is characterized by mixed low-voltage frequencies, which look like \"scattered noise\" or \"heterogeneity\" in a spectrogram. Preprocessing: the Log-Transform was used, which pulls low-power background noise up into the visible range (the blue/green speckles). This prevents the model from ignoring subtle details, but it makes the image look \"grainy.\"")
-            
-            subcol1, subcol2 = st.columns(2)
-            with subcol1:
-                st.image(os.path.join(img_dir, "spec_Wake.png"), caption="Wake Stage", use_container_width=True)
-                st.image(os.path.join(img_dir, "spec_N2.png"), caption="N2 Stage", use_container_width=True)
-            with subcol2:
-                st.image(os.path.join(img_dir, "spec_N1.png"), caption="N1 Stage", use_container_width=True)
-                st.image(os.path.join(img_dir, "spec_N3.png"), caption="N3 Stage", use_container_width=True)
-                
-        with col_img2:
-            st.markdown("#### Layer Analysis (trainNetwork)")
-            st.caption("Detailed EEGSNet structure: CNN for spatial feature extraction followed by Bi-LSTM for temporal dependencies.")
-            st.image(os.path.join(img_dir, "model_architecture.png"), use_container_width=True)
-
-        st.markdown("---")
-        
+        st.title("EEGSNet Project")
+        st.info("ℹ️ This module allows you to interact with and use the EEGSNet codebase directly.")
         e_run_title = "🚀 Run EEGSNet Training"
         e_run_desc = "Execute the `train.py` pipeline. Note that this may take a significant amount of time."
         e_btn = "Run train.py (EEGSNet)"
