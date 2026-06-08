@@ -10,7 +10,7 @@ A Streamlit-based dashboard for managing, analyzing, and running inference with 
     - Removed obsolete Github links from the Streamlit sidebar.
     - Cleaned up the React Sidebar to remove legacy `Sleep-EDFX-78` datasets.
 
-### 📜 v1.7.1 Changes
+### 📜 v1.7.0 Changes
 - **Comparative Analysis (HECAM)**:
     - **New Report Generation**: Implemented `process_hecam.py` to generate detailed comparative reports for BDF files (predictions vs baseline) without Ground Truth.
     - **Visual Upgrades**: Reports now include "Agreement Matrices" (replacing Confusion Matrices) and standard comparative hypnograms with class distributions.
