@@ -520,7 +520,7 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 🔗 Links / Enlaces")
-    st.markdown("[📁 02_python_eeg Project Code (GitHub)](https://github.com/dhinostroza/EEG-Neural-Network-Checkpoint-Dashboard/tree/main/02_python_eeg)")
+    st.markdown("[📁 EEGSNET Project Code (GitHub)](https://github.com/dhinostroza/EEG-Neural-Network-Checkpoint-Dashboard/tree/main/03_nssr_shhs/EEGSNET)")
 
 
 
@@ -983,7 +983,7 @@ if selected_history_files:
     pass
 
 # HACK: Manage Tab selection by just rendering them.
-tab_portada, tab_env, tab_scripts, tab1, tab2, tab3, tab4, tab_glossary = st.tabs([
+tab_portada, tab_env, tab_scripts, tab1, tab2, tab3, tab4, tab_glossary, tab_eegsnet = st.tabs([
     t("tab_portada"),
     t("tab_env"), 
     t("tab_scripts_general"),
@@ -991,7 +991,8 @@ tab_portada, tab_env, tab_scripts, tab1, tab2, tab3, tab4, tab_glossary = st.tab
     t("tab_inference"), 
     t("tab_batch"), 
     t("tab_script"),
-    "Glosario"
+    "Glosario",
+    "EEGSNET"
 ])
 
 # ==============================================================================
@@ -3467,5 +3468,42 @@ with tab_glossary:
         height=700,
         column_config=column_config
     )
+
+# ==============================================================================
+# TAB EEGSNET
+# ==============================================================================
+with tab_eegsnet:
+    st.title("EEGSNET Project")
+    st.warning("⚠️ This module contains the codebase for EEGSNET. It is a placeholder for a project that will not advance further.")
+    
+    eegsnet_dir = os.path.join(os.path.dirname(__file__), "EEGSNET")
+    
+    if os.path.exists(eegsnet_dir):
+        files = [f for f in os.listdir(eegsnet_dir) if os.path.isfile(os.path.join(eegsnet_dir, f))]
+        
+        if files:
+            selected_file = st.selectbox("Select a file to view:", sorted(files))
+            
+            if selected_file:
+                file_path = os.path.join(eegsnet_dir, selected_file)
+                st.markdown(f"**Viewing `{selected_file}`**")
+                
+                # Check if it's a PDF
+                if selected_file.endswith('.pdf'):
+                    st.info("PDF file cannot be previewed in code block. Please open it locally.")
+                else:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        
+                        lang = 'python' if selected_file.endswith('.py') else 'text'
+                        with st.container(height=600):
+                            st.code(content, language=lang)
+                    except Exception as e:
+                        st.error(f"Could not read file {selected_file}: {e}")
+        else:
+            st.info("No files found in EEGSNET directory.")
+    else:
+        st.error(f"EEGSNET directory not found at {eegsnet_dir}")
 
 
