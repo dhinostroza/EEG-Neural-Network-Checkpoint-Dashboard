@@ -1,9 +1,16 @@
 # EEG Neural Network Checkpoint Dashboard
-![Version](https://img.shields.io/badge/version-v1.7.1-blue)
+![Version](https://img.shields.io/badge/version-v1.7.3-blue)
 
 A Streamlit-based dashboard for managing, analyzing, and running inference with PyTorch Lightning checkpoints trained on SHHS EEG data.
 
-### 🆕 v1.7.1 Changes
+### 🆕 v1.7.3 Changes
+- **EEGSNet Integration**: 
+    - Removed the React iframe and legacy UI from the Streamlit `EEGSNet` tab to prevent rendering issues.
+    - Implemented a clean, Javascript-based auto-redirect that seamlessly opens the standalone React EEGSNet dashboard (`localhost:5173`) in a new browser tab upon selection.
+    - Removed obsolete Github links from the Streamlit sidebar.
+    - Cleaned up the React Sidebar to remove legacy `Sleep-EDFX-78` datasets.
+
+### 📜 v1.7.1 Changes
 - **Comparative Analysis (HECAM)**:
     - **New Report Generation**: Implemented `process_hecam.py` to generate detailed comparative reports for BDF files (predictions vs baseline) without Ground Truth.
     - **Visual Upgrades**: Reports now include "Agreement Matrices" (replacing Confusion Matrices) and standard comparative hypnograms with class distributions.
