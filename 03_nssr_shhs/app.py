@@ -520,7 +520,7 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 🔗 Links / Enlaces")
-    st.markdown("[📁 EEGSNET Project Code (GitHub)](https://github.com/dhinostroza/EEG-Neural-Network-Checkpoint-Dashboard/tree/main/03_nssr_shhs/EEGSNET)")
+    st.markdown("👉 [**Use the EEGSNET Project Tab above**](#)")
 
 
 
@@ -3474,15 +3474,49 @@ with tab_glossary:
 # ==============================================================================
 with tab_eegsnet:
     st.title("EEGSNET Project")
-    st.warning("⚠️ This module contains the codebase for EEGSNET. It is a placeholder for a project that will not advance further.")
+    st.info("ℹ️ This module allows you to interact with and use the EEGSNET legacy codebase directly.")
     
     eegsnet_dir = os.path.join(os.path.dirname(__file__), "EEGSNET")
     
     if os.path.exists(eegsnet_dir):
+        # 1. Execution Section
+        st.subheader("🚀 Run EEGSNET Training")
+        st.markdown("Execute the `train.py` pipeline. Note that this may take a significant amount of time.")
+        
+        if st.button("Run train.py (EEGSNET)", type="primary"):
+            train_script = os.path.join(eegsnet_dir, "train.py")
+            if os.path.exists(train_script):
+                st.info("Starting training process...")
+                try:
+                    import subprocess
+                    # Run synchronously for now, or stream output
+                    process = subprocess.Popen(["python3", train_script], cwd=eegsnet_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    
+                    st_output = st.empty()
+                    output_text = ""
+                    for line in process.stdout:
+                        output_text += line
+                        # Update the UI every few lines or just append
+                        st_output.code(output_text[-2000:], language='text') # Show last 2000 chars to avoid memory issues
+                        
+                    process.wait()
+                    if process.returncode == 0:
+                        st.success("Training completed successfully!")
+                    else:
+                        st.error(f"Training failed with return code {process.returncode}")
+                except Exception as e:
+                    st.error(f"Failed to run script: {e}")
+            else:
+                st.error("train.py not found in the EEGSNET directory.")
+                
+        st.markdown("---")
+        
+        # 2. File Viewer Section
+        st.subheader("📁 Project Files")
         files = [f for f in os.listdir(eegsnet_dir) if os.path.isfile(os.path.join(eegsnet_dir, f))]
         
         if files:
-            selected_file = st.selectbox("Select a file to view:", sorted(files))
+            selected_file = st.selectbox("Select a file to view or inspect:", sorted(files))
             
             if selected_file:
                 file_path = os.path.join(eegsnet_dir, selected_file)
