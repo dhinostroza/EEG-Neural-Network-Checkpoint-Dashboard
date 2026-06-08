@@ -988,7 +988,7 @@ tab_portada, tab_env, tab_scripts, tab1, tab2, tab3, tab4, tab_eegsnet, tab_glos
     t("tab_inference"), 
     t("tab_batch"), 
     t("tab_script"),
-    "EEGSNET",
+    "EEGSNet",
     "Glosario"
 ])
 
@@ -3467,19 +3467,19 @@ with tab_glossary:
     )
 
 # ==============================================================================
-# TAB EEGSNET
+# TAB EEGSNet
 # ==============================================================================
 with tab_eegsnet:
     if LANG == 'es':
-        st.title("Proyecto EEGSNET")
-        st.info("ℹ️ Este módulo te permite interactuar y usar el código de EEGSNET directamente.")
-        e_run_title = "🚀 Ejecutar Entrenamiento EEGSNET"
+        st.title("Proyecto EEGSNet")
+        st.info("ℹ️ Este módulo te permite interactuar y usar el código de EEGSNet directamente.")
+        e_run_title = "🚀 Ejecutar Entrenamiento EEGSNet"
         e_run_desc = "Ejecuta el script `train.py`. Nota: Esto puede tomar un tiempo considerable."
-        e_btn = "Ejecutar train.py (EEGSNET)"
+        e_btn = "Ejecutar train.py (EEGSNet)"
         e_start = "Iniciando proceso de entrenamiento..."
         e_success = "¡Entrenamiento completado con éxito!"
         e_fail = "El entrenamiento falló con código de salida"
-        e_script_err = "No se encontró train.py en el directorio de EEGSNET."
+        e_script_err = "No se encontró train.py en el directorio de EEGSNet."
         e_file_title = "📁 Archivos del Proyecto"
         e_select = "Selecciona un archivo para ver o inspeccionar:"
         e_viewing = "Viendo"
@@ -3487,15 +3487,15 @@ with tab_eegsnet:
         e_not_found = "No se encontraron archivos en el directorio 02_python_eeg."
         e_dir_err = "No se encontró el directorio en"
     else:
-        st.title("EEGSNET Project")
-        st.info("ℹ️ This module allows you to interact with and use the EEGSNET codebase directly.")
-        e_run_title = "🚀 Run EEGSNET Training"
+        st.title("EEGSNet Project")
+        st.info("ℹ️ This module allows you to interact with and use the EEGSNet codebase directly.")
+        e_run_title = "🚀 Run EEGSNet Training"
         e_run_desc = "Execute the `train.py` pipeline. Note that this may take a significant amount of time."
-        e_btn = "Run train.py (EEGSNET)"
+        e_btn = "Run train.py (EEGSNet)"
         e_start = "Starting training process..."
         e_success = "Training completed successfully!"
         e_fail = "Training failed with return code"
-        e_script_err = "train.py not found in the EEGSNET directory."
+        e_script_err = "train.py not found in the EEGSNet directory."
         e_file_title = "📁 Project Files"
         e_select = "Select a file to view or inspect:"
         e_viewing = "Viewing"
