@@ -517,7 +517,10 @@ with st.sidebar:
         <p style="font-size: 0.85em; font-weight: bold; color: #4CAF50;">v{sidebar_version}</p>
     </div>
     """, unsafe_allow_html=True)
-    # Removed Links / Enlaces section here since it was moved to the top menu tabs
+    
+    st.markdown("---")
+    st.markdown("### 🔗 Links / Enlaces")
+    st.markdown("[📁 02_python_eeg Project Code (GitHub)](https://github.com/dhinostroza/EEG-Neural-Network-Checkpoint-Dashboard/tree/main/02_python_eeg)")
 
 
 
@@ -3414,6 +3417,46 @@ with tab4:
         st.error(f"Script file not found: {script_path}")
 
 # ==============================================================================
+# ==============================================================================
+# TAB EEGSNet
+# ==============================================================================
+with tab_eegsnet:
+    st.title("Proyecto EEGSNet" if LANG == 'es' else "EEGSNet Project")
+    st.warning("⚠️ Este módulo contiene la base de código para EEGSNet. Es un marcador de posición para un proyecto que no avanzará más." if LANG == 'es' else "⚠️ This module contains the codebase for EEGSNet. It is a placeholder for a project that will not advance further.")
+    
+    eegsnet_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "02_python_eeg"))
+    
+    if os.path.exists(eegsnet_dir):
+        files = [f for f in os.listdir(eegsnet_dir) if os.path.isfile(os.path.join(eegsnet_dir, f))]
+        
+        if files:
+            e_select = "Selecciona un archivo para ver:" if LANG == 'es' else "Select a file to view:"
+            selected_file = st.selectbox(e_select, sorted(files))
+            
+            if selected_file:
+                file_path = os.path.join(eegsnet_dir, selected_file)
+                e_viewing = "Viendo" if LANG == 'es' else "Viewing"
+                st.markdown(f"**{e_viewing} `{selected_file}`**")
+                
+                # Check if it's a PDF
+                if selected_file.endswith('.pdf'):
+                    e_pdf_err = "El archivo PDF no se puede previsualizar en bloque de código. Por favor ábrelo localmente." if LANG == 'es' else "PDF file cannot be previewed in code block. Please open it locally."
+                    st.info(e_pdf_err)
+                else:
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            code_content = f.read()
+                        st.code(code_content, language="python" if selected_file.endswith(".py") else "text")
+                    except Exception as e:
+                        st.error(f"Error reading file: {e}")
+        else:
+            e_not_found = "No se encontraron archivos en el directorio 02_python_eeg." if LANG == 'es' else "No files found in 02_python_eeg directory."
+            st.info(e_not_found)
+    else:
+        e_dir_err = "No se encontró el directorio EEGSNet." if LANG == 'es' else "EEGSNET folder not found."
+        st.info(e_dir_err)
+
+# ==============================================================================
 # TAB GLOSSARY
 # ==============================================================================
 with tab_glossary:
@@ -3465,102 +3508,5 @@ with tab_glossary:
         height=700,
         column_config=column_config
     )
-
-# ==============================================================================
-# TAB EEGSNet
-# ==============================================================================
-with tab_eegsnet:
-    if LANG == 'es':
-        st.title("Proyecto EEGSNet")
-        st.info("ℹ️ Este módulo te permite interactuar y usar el código de EEGSNet directamente.")
-        e_run_title = "🚀 Ejecutar Entrenamiento EEGSNet"
-        e_run_desc = "Ejecuta el script `train.py`. Nota: Esto puede tomar un tiempo considerable."
-        e_btn = "Ejecutar train.py (EEGSNet)"
-        e_start = "Iniciando proceso de entrenamiento..."
-        e_success = "¡Entrenamiento completado con éxito!"
-        e_fail = "El entrenamiento falló con código de salida"
-        e_script_err = "No se encontró train.py en el directorio de EEGSNet."
-        e_file_title = "📁 Archivos del Proyecto"
-        e_select = "Selecciona un archivo para ver o inspeccionar:"
-        e_viewing = "Viendo"
-        e_pdf_err = "El archivo PDF no se puede previsualizar en bloque de código. Por favor ábrelo localmente."
-        e_not_found = "No se encontraron archivos en el directorio 02_python_eeg."
-        e_dir_err = "No se encontró el directorio en"
-    else:
-        st.title("EEGSNet Project")
-        st.info("ℹ️ This module allows you to interact with and use the EEGSNet codebase directly.")
-        e_run_title = "🚀 Run EEGSNet Training"
-        e_run_desc = "Execute the `train.py` pipeline. Note that this may take a significant amount of time."
-        e_btn = "Run train.py (EEGSNet)"
-        e_start = "Starting training process..."
-        e_success = "Training completed successfully!"
-        e_fail = "Training failed with return code"
-        e_script_err = "train.py not found in the EEGSNet directory."
-        e_file_title = "📁 Project Files"
-        e_select = "Select a file to view or inspect:"
-        e_viewing = "Viewing"
-        e_pdf_err = "PDF file cannot be previewed in code block. Please open it locally."
-        e_not_found = "No files found in 02_python_eeg directory."
-        e_dir_err = "Directory not found at"
-
-    # Point directly to the original 02_python_eeg directory
-    eegsnet_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "02_python_eeg"))
-    
-    if os.path.exists(eegsnet_dir):
-        st.subheader(e_run_title)
-        st.markdown(e_run_desc)
-        
-        if st.button(e_btn, type="primary"):
-            train_script = os.path.join(eegsnet_dir, "train.py")
-            if os.path.exists(train_script):
-                st.info(e_start)
-                try:
-                    import subprocess
-                    import sys
-                    process = subprocess.Popen([sys.executable, train_script], cwd=eegsnet_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                    
-                    st_output = st.empty()
-                    output_text = ""
-                    for line in process.stdout:
-                        output_text += line
-                        st_output.code(output_text[-2000:], language='text')
-                        
-                    process.wait()
-                    if process.returncode == 0:
-                        st.success(e_success)
-                    else:
-                        st.error(f"{e_fail} {process.returncode}")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-            else:
-                st.error(e_script_err)
-                
-        st.markdown("---")
-        
-        st.subheader(e_file_title)
-        files = [f for f in os.listdir(eegsnet_dir) if os.path.isfile(os.path.join(eegsnet_dir, f))]
-        
-        if files:
-            selected_file = st.selectbox(e_select, sorted(files))
-            
-            if selected_file:
-                file_path = os.path.join(eegsnet_dir, selected_file)
-                st.markdown(f"**{e_viewing} `{selected_file}`**")
-                
-                if selected_file.endswith('.pdf'):
-                    st.info(e_pdf_err)
-                else:
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                        lang = 'python' if selected_file.endswith('.py') else 'text'
-                        with st.container(height=600):
-                            st.code(content, language=lang)
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-        else:
-            st.info(e_not_found)
-    else:
-        st.error(f"{e_dir_err} {eegsnet_dir}")
 
 
