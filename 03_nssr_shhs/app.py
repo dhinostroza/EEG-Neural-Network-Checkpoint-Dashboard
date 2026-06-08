@@ -518,9 +518,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
-    st.markdown("### 🔗 Links / Enlaces")
-    st.markdown("[📁 02_python_eeg Project Code (GitHub)](https://github.com/dhinostroza/EEG-Neural-Network-Checkpoint-Dashboard/tree/main/02_python_eeg)")
 
 
 
