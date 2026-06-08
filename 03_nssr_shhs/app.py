@@ -3421,22 +3421,19 @@ with tab4:
 # TAB EEGSNet
 # ==============================================================================
 with tab_eegsnet:
-    st.title("Proyecto EEGSNet" if LANG == 'es' else "EEGSNet Project")
-    st.warning("⚠️ Este módulo contiene la base de código para EEGSNet. Es un marcador de posición para un proyecto que no avanzará más." if LANG == 'es' else "⚠️ This module contains the codebase for EEGSNet. It is a placeholder for a project that will not advance further.")
+    st.title("Proyecto EEGSNet")
+    st.info("Este módulo enlaza al dashboard interactivo en React para la visualización detallada del proyecto EEGSNet.")
     
-    st.markdown("### 🌐 Dashboard Interactivo / Interactive Dashboard")
+    st.markdown("### 🌐 Dashboard Interactivo")
     st.markdown(
-        '<a href="http://localhost:5173/" target="_blank" style="display: inline-block; padding: 0.5em 1em; color: white; background-color: #4F46E5; text-decoration: none; border-radius: 4px; font-weight: bold; margin-bottom: 15px;">'
-        '🚀 Abrir Dashboard en Nueva Pestaña / Open Dashboard in New Tab'
+        '<a href="http://localhost:5173/" target="_blank" style="display: block; padding: 1em; color: white; background-color: #4F46E5; text-decoration: none; border-radius: 8px; font-weight: bold; text-align: center; margin: 20px 0; font-size: 1.1em;">'
+        '🚀 Abrir Dashboard de EEGSNet en Nueva Pestaña'
         '</a>',
         unsafe_allow_html=True
     )
     
-    import streamlit.components.v1 as components
-    components.iframe("http://localhost:5173/", height=800, scrolling=True)
-    
     st.markdown("---")
-    st.markdown("### 📁 Explorador de Archivos / File Explorer")
+    st.markdown("### 📁 Explorador de Archivos Backend")
     
     eegsnet_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "02_python_eeg"))
     
