@@ -4,11 +4,25 @@
 A Streamlit-based dashboard for managing, analyzing, and running inference with PyTorch Lightning checkpoints trained on SHHS EEG data.
 
 ### 🆕 v1.7.3 Changes
-- **EEGSNet Integration**: 
+- **EEGSNet Integration Fixes**: 
     - Removed the React iframe and legacy UI from the Streamlit `EEGSNet` tab to prevent rendering issues.
     - Implemented a clean, Javascript-based auto-redirect that seamlessly opens the standalone React EEGSNet dashboard (`localhost:5173`) in a new browser tab upon selection.
     - Removed obsolete Github links from the Streamlit sidebar.
     - Cleaned up the React Sidebar to remove legacy `Sleep-EDFX-78` datasets.
+
+### 📜 v1.7.2 Changes
+- **EEGSNet & React Dashboard Merge**:
+    - Embedded the React frontend directly into the Streamlit app via an iframe inside the new `EEGSNet` tab.
+    - Migrated `02_python_eeg` experimental analysis docs and Markdown files directly into the Streamlit UI.
+    - Renamed EEGSNET to EEGSNet across all UI components and set Spanish as the default language.
+
+### 📜 v1.7.1 Changes
+- **Checkpoint & Registry UI Fixes**:
+    - Fixed checkpoint display names with timezone corrections (e.g., matching filesystem timestamps).
+    - Hid duplicate `09-37` model rows to avoid visual clutter.
+    - Reverted highlight logic to threshold-only for validation loss.
+- **EEGSNet Navigation**:
+    - Temporarily added Github links to `02_python_eeg` codebase (later replaced).
 
 ### 📜 v1.7.0 Changes
 - **Comparative Analysis (HECAM)**:
