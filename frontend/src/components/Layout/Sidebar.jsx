@@ -99,9 +99,7 @@ const Sidebar = ({ onSelectProject, language = 'es', setLanguage }) => {
                     </div>
                     {/* Assuming structure: projects['date'][0] is the main project */}
                     {renderProjectList([
-                        ...projects['2025-04-22'][0].experiments.filter(p => p.type === 'dataset'),
-                        // Manually adding Stage 20 which is nested
-                        projects['2025-04-22'][0].experiments[1].children[0]
+                        ...projects['2025-04-22'][0].experiments.filter(p => p.type === 'dataset')
                     ])}
                 </div>
 
