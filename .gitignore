@@ -32,3 +32,4 @@ __pycache__/
 !*.png
 annotations-events-*
 
+*.mp4
