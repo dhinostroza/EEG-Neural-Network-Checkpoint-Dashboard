@@ -3516,7 +3516,8 @@ with tab_eegsnet:
                 st.info(e_start)
                 try:
                     import subprocess
-                    process = subprocess.Popen(["python3", train_script], cwd=eegsnet_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    import sys
+                    process = subprocess.Popen([sys.executable, train_script], cwd=eegsnet_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                     
                     st_output = st.empty()
                     output_text = ""
