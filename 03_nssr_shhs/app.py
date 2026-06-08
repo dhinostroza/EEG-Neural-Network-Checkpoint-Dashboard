@@ -3424,6 +3424,20 @@ with tab_eegsnet:
     st.title("Proyecto EEGSNet" if LANG == 'es' else "EEGSNet Project")
     st.warning("⚠️ Este módulo contiene la base de código para EEGSNet. Es un marcador de posición para un proyecto que no avanzará más." if LANG == 'es' else "⚠️ This module contains the codebase for EEGSNet. It is a placeholder for a project that will not advance further.")
     
+    st.markdown("### 🌐 Dashboard Interactivo / Interactive Dashboard")
+    st.markdown(
+        '<a href="http://localhost:5173/" target="_blank" style="display: inline-block; padding: 0.5em 1em; color: white; background-color: #4F46E5; text-decoration: none; border-radius: 4px; font-weight: bold; margin-bottom: 15px;">'
+        '🚀 Abrir Dashboard en Nueva Pestaña / Open Dashboard in New Tab'
+        '</a>',
+        unsafe_allow_html=True
+    )
+    
+    import streamlit.components.v1 as components
+    components.iframe("http://localhost:5173/", height=800, scrolling=True)
+    
+    st.markdown("---")
+    st.markdown("### 📁 Explorador de Archivos / File Explorer")
+    
     eegsnet_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "02_python_eeg"))
     
     if os.path.exists(eegsnet_dir):
