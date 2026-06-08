@@ -509,6 +509,11 @@ with st.sidebar:
         <p style="font-size: 0.85em;">2026-01-08</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.markdown("### 🔗 Links / Enlaces")
+    st.markdown("[📁 02_python_eeg Project Code](../02_python_eeg)")
+
 
 def t(key):
     return TRANSLATIONS.get(key, {}).get(LANG, key)
@@ -1383,7 +1388,14 @@ with tab_scripts:
 # TAB 1: DASHBOARD
 # ==============================================================================
 with tab1:
-    st.title(t("header_title"))
+    # Read version from VERSION file
+    try:
+        with open(os.path.join(os.path.dirname(__file__), 'VERSION'), 'r') as f:
+            app_version = f.read().strip()
+    except Exception:
+        app_version = "1.7.1"
+        
+    st.title(f"{t('header_title')} (v{app_version})")
     st.markdown(t("header_desc"))
     
     # 1. Group Selector
@@ -1762,6 +1774,10 @@ with tab1:
         
         st_df = df_display[display_cols].sort_values(by='date_modified', ascending=False) # Sort by date modified (newest first)
         
+        # Fix mixed-type 'epoch' column (int + str) that causes pyarrow ArrowTypeError
+        if 'epoch' in st_df.columns:
+            st_df['epoch'] = st_df['epoch'].astype(str)
+        
         # Apply style
         styled_df = st_df.style.apply(highlight_good_models, axis=1).format({
             "val_loss": "{:.4f}",
@@ -1769,7 +1785,7 @@ with tab1:
             "params_m": "{:.2f}"
         })
         
-        st.dataframe(styled_df, width=None, use_container_width=True) # Removed height=800
+        st.dataframe(styled_df, width='stretch')
 
         # Render Report if available for the selected group (AFTER Table)
         if selected_group in REPORTS:
@@ -1830,10 +1846,10 @@ with tab2:
         if processed_files:
              # Bulk Actions
              col_sel, col_clr = st.columns(2)
-             if col_sel.button("Select All", key="btn_sel_all", use_container_width=True):
+             if col_sel.button("Select All", key="btn_sel_all", width='stretch'):
                  for f in processed_files:
                      st.session_state[f"hist_{f}"] = True
-             if col_clr.button("Clear", key="btn_clr_all", use_container_width=True):
+             if col_clr.button("Clear", key="btn_clr_all", width='stretch'):
                  for f in processed_files:
                      st.session_state[f"hist_{f}"] = False
 
@@ -2007,7 +2023,7 @@ with tab2:
             </style>
             """, unsafe_allow_html=True)
             
-        run_btn = st.button(t("analyze_btn"), type="primary", use_container_width=True)
+        run_btn = st.button(t("analyze_btn"), type="primary", width='stretch')
         
         global_status_container = st.empty()
 
@@ -2058,7 +2074,7 @@ with tab2:
                     caption_text = f"Reporte Generado ({date_str}): {core_name}" if LANG == 'es' else f"Report Generated ({date_str}): {core_name}"
                     
                     st.success(f"{'Reporte encontrado' if LANG == 'es' else 'Report found'}: `{fname}`")
-                    st.image(found_report, caption=caption_text, use_container_width=True)
+                    st.image(found_report, caption=caption_text, width='stretch')
                 
                 else:
                     # Fallback or No Report Message
@@ -2135,7 +2151,7 @@ with tab2:
                                 temp_output = f"temp_plot_{core_name}"
                                 generate_comparative_report(temp_output, y_true_plot, y_ens_plot, y_base_plot, "Baseline", 0,0,"", lang='ES')
                                 
-                                st.image(f"{temp_output}_es.png", caption=f"Visualización SQL: {core_name}", use_container_width=True)
+                                st.image(f"{temp_output}_es.png", caption=f"Visualización SQL: {core_name}", width='stretch')
                                 # Cleanup
                                 if os.path.exists(f"{temp_output}_es.png"): os.remove(f"{temp_output}_es.png")
                                 if os.path.exists(f"{temp_output}_en.png"): os.remove(f"{temp_output}_en.png")
@@ -2207,7 +2223,7 @@ with tab2:
                                     
                                 with mc2:
                                     # st.markdown("**Matriz de Confusión**")
-                                    st.dataframe(cm_df.style.background_gradient(cmap='Blues'), use_container_width=True)
+                                    st.dataframe(cm_df.style.background_gradient(cmap='Blues'), width='stretch')
                                     
                     except Exception as e_csv:
                         print(f"Error loading CSV metrics: {e_csv}") # Log to console
@@ -2282,7 +2298,7 @@ with tab2:
                                     temp_output = f"temp_plot_{core_name}"
                                     generate_comparative_report(temp_output, y_true_plot, y_ens_plot, y_base_plot, "Baseline", 0,0,"", lang='ES')
                                     
-                                    st.image(f"{temp_output}_es.png", caption=f"Visualización SQL: {core_name}", use_container_width=True)
+                                    st.image(f"{temp_output}_es.png", caption=f"Visualización SQL: {core_name}", width='stretch')
                                     # Cleanup
                                     if os.path.exists(f"{temp_output}_es.png"): os.remove(f"{temp_output}_es.png")
                                     if os.path.exists(f"{temp_output}_en.png"): os.remove(f"{temp_output}_en.png")
@@ -2970,7 +2986,7 @@ with tab2:
                         
                         st.dataframe(
                             left_align_df, 
-                            use_container_width=True,  # Fit within the 3-column layout
+                            width='stretch',
                             height=400,
                             column_config=col_config
                         )
@@ -3017,7 +3033,7 @@ with tab2:
                                 
                                 st.dataframe(
                                     comp_df,
-                                    use_container_width=True,
+                                    width='stretch',
                                     height=300,
                                     column_config={
                                         "Epoch": st.column_config.NumberColumn("Epoch", format="%d"),
@@ -3048,7 +3064,7 @@ with tab2:
                                     colnames=['Predicted']
                                 )
                                 # Center the matrix
-                                st.dataframe(cm_df.style.background_gradient(cmap='Blues'), use_container_width=True)
+                                st.dataframe(cm_df.style.background_gradient(cmap='Blues'), width='stretch')
                             else:
                                 st.caption("No valid data for CM")
                         else:
@@ -3182,7 +3198,7 @@ with tab3:
     if st.session_state.batch_files:
         st.subheader(f"{t('batch_pending')} ({len(st.session_state.batch_files)})")
         df_pending = pd.DataFrame(st.session_state.batch_files, columns=["Filepath"])
-        st.dataframe(df_pending, height=200, use_container_width=True)
+        st.dataframe(df_pending, height=200, width='stretch')
         
         # 3. Process Button
         if st.button(t("batch_start_btn"), type="primary"):
@@ -3437,7 +3453,7 @@ with tab_glossary:
 
     st.dataframe(
         display_df, 
-        use_container_width=True, 
+        width='stretch', 
         hide_index=True, 
         height=700,
         column_config=column_config
