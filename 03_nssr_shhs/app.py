@@ -499,6 +499,13 @@ with st.sidebar:
         c_tutor = "Advisor:"
         c_student = "Student:"
 
+    # Read version from VERSION file to display in sidebar
+    try:
+        with open(os.path.join(os.path.dirname(__file__), 'VERSION'), 'r') as f:
+            sidebar_version = f.read().strip()
+    except Exception:
+        sidebar_version = "1.7.1"
+
     st.markdown(f"""
     <div style="text-align: left; margin-top: 10px; margin-bottom: 20px;">
         <p style="font-weight: bold; font-size: 0.9em; margin-bottom: 5px;">
@@ -506,13 +513,15 @@ with st.sidebar:
         </p>
         <p style="font-size: 0.85em; margin-bottom: 2px;">{c_uni}</p>
         <p style="font-size: 0.85em; margin-bottom: 2px;">{c_degree}</p>
-        <p style="font-size: 0.85em;">2026-01-08</p>
+        <p style="font-size: 0.85em; margin-bottom: 2px;">2026-01-08</p>
+        <p style="font-size: 0.85em; font-weight: bold; color: #4CAF50;">v{sidebar_version}</p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown("### 🔗 Links / Enlaces")
-    st.markdown("[📁 02_python_eeg Project Code](../02_python_eeg)")
+    st.markdown("[📁 02_python_eeg Project Code (GitHub)](https://github.com/dhinostroza/EEG-Neural-Network-Checkpoint-Dashboard/tree/main/02_python_eeg)")
+
 
 
 def t(key):

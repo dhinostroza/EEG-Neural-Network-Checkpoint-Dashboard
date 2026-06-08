@@ -1,9 +1,9 @@
 # EEG Neural Network Checkpoint Dashboard
-![Version](https://img.shields.io/badge/version-v1.7.0-blue)
+![Version](https://img.shields.io/badge/version-v1.7.1-blue)
 
 A Streamlit-based dashboard for managing, analyzing, and running inference with PyTorch Lightning checkpoints trained on SHHS EEG data.
 
-### 🆕 v1.7.0 Changes
+### 🆕 v1.7.1 Changes
 - **Comparative Analysis (HECAM)**:
     - **New Report Generation**: Implemented `process_hecam.py` to generate detailed comparative reports for BDF files (predictions vs baseline) without Ground Truth.
     - **Visual Upgrades**: Reports now include "Agreement Matrices" (replacing Confusion Matrices) and standard comparative hypnograms with class distributions.
